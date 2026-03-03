@@ -41,3 +41,18 @@ export interface Topic {
 	title: string;
 	activities: Activity[];
 }
+
+// ── Upcoming events (from calendar) ──
+
+export interface UpcomingEvent {
+	id: string;
+	title: string;
+	courseName: string;
+	courseUrl: string;
+	dueDate: string;
+	dueTime: string;
+	component: string;
+	eventType: string;
+	description: string;
+	link: string;
+}

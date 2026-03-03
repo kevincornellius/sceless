@@ -1,29 +1,29 @@
 {
-  "name": "wxt-starter",
-  "description": "manifest.json description",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "wxt",
-    "dev:firefox": "wxt -b firefox",
-    "build": "wxt build",
-    "build:firefox": "wxt build -b firefox",
-    "zip": "wxt zip",
-    "zip:firefox": "wxt zip -b firefox",
-    "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
-  },
-  "devDependencies": {
-    "@preact/preset-vite": "^2.10.3",
-    "@tailwindcss/vite": "^4.2.1",
-    "tailwindcss": "^4.2.1",
-    "typescript": "^5.9.3",
-    "wxt": "^0.20.18"
-  },
-  "dependencies": {
-    "@preact/signals": "^2.8.1",
-    "lucide-preact": "^0.576.0",
-    "preact": "^10.28.4"
-  }
+	"name": "sceless",
+	"description": "manifest.json description",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "wxt",
+		"dev:firefox": "wxt -b firefox",
+		"build": "wxt build",
+		"build:firefox": "wxt build -b firefox",
+		"zip": "wxt zip",
+		"zip:firefox": "wxt zip -b firefox",
+		"compile": "tsc --noEmit",
+		"postinstall": "wxt prepare"
+	},
+	"devDependencies": {
+		"@preact/preset-vite": "^2.10.3",
+		"@tailwindcss/vite": "^4.2.1",
+		"tailwindcss": "^4.2.1",
+		"typescript": "^5.9.3",
+		"wxt": "^0.20.18"
+	},
+	"dependencies": {
+		"@preact/signals": "^2.8.1",
+		"lucide-preact": "^0.576.0",
+		"preact": "^10.28.4"
+	}
 }

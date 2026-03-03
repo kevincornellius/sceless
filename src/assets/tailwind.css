@@ -93,3 +93,26 @@
   --color-warn-fg:           #fcd34d;   /* amber-300 */
   --color-warn-edge:         #92400e;   /* amber-800 */
 }
+
+/* ── Custom scrollbar styling ──────────────────────────────── */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-edge);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background: var(--color-muted);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--color-edge-strong);
+}

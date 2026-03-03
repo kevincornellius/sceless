@@ -3,6 +3,7 @@ import type {
 	ActivityDates,
 	ActivityType,
 	Topic,
+	UpcomingEvent,
 } from "../types/scele";
 
 export const scrapeSceleData = () => {
@@ -201,5 +202,92 @@ export const fetchCourseContent = async (
 	} catch (error) {
 		console.error("[sceless] Course content fetch error:", error);
 		return { title: "Course", topics: [] };
+	}
+};
+
+export const fetchUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
+	try {
+		console.log("[sceless] Ghost fetching calendar/upcoming ...");
+
+		const response = await fetch(
+			"https://scele.cs.ui.ac.id/calendar/view.php?view=upcoming",
+		);
+		if (!response.ok) throw new Error("Failed to fetch calendar");
+
+		const htmlText = await response.text();
+		const parser = new DOMParser();
+		const virtualDoc = parser.parseFromString(htmlText, "text/html");
+
+		const eventElements = Array.from(
+			virtualDoc.querySelectorAll(".eventlist .event"),
+		);
+
+		const events: UpcomingEvent[] = eventElements.map((eventEl) => {
+			const id = eventEl.getAttribute("data-event-id") ?? "";
+			const component =
+				eventEl.getAttribute("data-event-component") ?? "";
+			const eventType =
+				eventEl.getAttribute("data-event-eventtype") ?? "";
+
+			const titleEl = eventEl.querySelector("h3.name");
+			const title = titleEl?.textContent?.trim() ?? "Unknown Event";
+
+			// Extract due date and time
+			let dueDate = "";
+			let dueTime = "";
+			const dateLink = eventEl.querySelector(
+				".description .row:first-child a",
+			) as HTMLAnchorElement | null;
+			if (dateLink && dateLink.textContent) {
+				const dateText = dateLink.textContent.trim();
+				const timeText =
+					dateLink.nextSibling?.textContent?.trim() ?? "";
+				dueDate = dateText;
+				dueTime = timeText.replace(",", "").trim();
+			}
+
+			// Extract description
+			const descEl = eventEl.querySelector(".description-content");
+			const description = descEl?.textContent?.trim() ?? "";
+
+			// Extract course name and URL
+			let courseName = "";
+			let courseUrl = "";
+			const courseLink = eventEl.querySelector(
+				".description a[href*='course/view']",
+			) as HTMLAnchorElement | null;
+			if (courseLink) {
+				courseName = courseLink.textContent?.trim() ?? "";
+				courseUrl = courseLink.href ?? "";
+			}
+
+			// Extract activity link
+			let link = "";
+			const activityLink = eventEl.querySelector(
+				".card-footer a.card-link",
+			) as HTMLAnchorElement | null;
+			if (activityLink) {
+				link = activityLink.href ?? "";
+			}
+
+			return {
+				id,
+				title,
+				courseName,
+				courseUrl,
+				dueDate,
+				dueTime,
+				component,
+				eventType,
+				description,
+				link,
+			};
+		});
+
+		console.log("[sceless] Parsed upcoming events:", events);
+		return events;
+	} catch (error) {
+		console.error("[sceless] Upcoming events fetch error:", error);
+		return [];
 	}
 };

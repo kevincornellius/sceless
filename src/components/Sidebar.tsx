@@ -141,7 +141,7 @@ const Sidebar = ({ data }: { data: InitialData }) => {
 				<div class="flex flex-col px-2 mt-2">
 					{expanded && (
 						<p class="px-2 mb-1 text-xs font-medium text-content-dim uppercase tracking-wider">
-							Open
+							Tabs
 						</p>
 					)}
 					{tabs.map((tab) => (
