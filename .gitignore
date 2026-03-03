@@ -25,3 +25,7 @@ web-ext.config.ts
 *.sln
 *.sw?
 .wxt
+
+# Browser Profiles
+.chrome-profile/
+.firefox-profile/

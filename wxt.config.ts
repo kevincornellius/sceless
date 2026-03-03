@@ -1,7 +1,7 @@
 import { defineConfig } from "wxt";
 import preact from "@preact/preset-vite";
 import tailwindcss from "@tailwindcss/vite";
-import { h } from "preact";
+import path from "node:path";
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
@@ -21,9 +21,9 @@ export default defineConfig({
 			"https://scele.cs.ui.ac.id/login/index.php",
 		],
 
-		chromiumProfile: "./.wxt/chrome-profile",
+		chromiumProfile: path.resolve(process.cwd(), "./.chrome-profile"),
 
-		firefoxProfile: "./.wxt/firefox-profile",
+		firefoxProfile: path.resolve(process.cwd(), "./.firefox-profile"),
 		keepProfileChanges: true,
 	},
 	manifest: {

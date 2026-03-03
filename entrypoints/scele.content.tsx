@@ -2,11 +2,12 @@ import { render } from "preact";
 import App from "@/src/App";
 import { enabledStorage } from "@/src/storage";
 import { scrapeSceleData } from "@/src/utils/scraper";
-import { SCELE_MATCHES } from "@/src/config";
+import { SCELE_EXCLUDES, SCELE_MATCHES } from "@/src/config";
 import tailwindCss from "@/src/assets/tailwind.css?inline";
 
 export default defineContentScript({
 	matches: SCELE_MATCHES,
+	excludeMatches: SCELE_EXCLUDES,
 	runAt: "document_start",
 	cssInjectionMode: "manual",
 

@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@preact/signals':
+        specifier: ^2.8.1
+        version: 2.8.1(preact@10.28.4)
+      lucide-preact:
+        specifier: ^0.576.0
+        version: 0.576.0(preact@10.28.4)
       preact:
         specifier: ^10.28.4
         version: 10.28.4
@@ -354,6 +360,14 @@ packages:
     peerDependencies:
       '@babel/core': 7.x
       vite: 2.x || 3.x || 4.x || 5.x || 6.x || 7.x
+
+  '@preact/signals-core@1.13.0':
+    resolution: {integrity: sha512-slT6XeTCAbdql61GVLlGU4x7XHI7kCZV5Um5uhE4zLX4ApgiiXc0UYFvVOKq06xcovzp7p+61l68oPi563ARKg==}
+
+  '@preact/signals@2.8.1':
+    resolution: {integrity: sha512-wX6U0SpcCukZTJBs5ChljvBZb3XmYzA5gd4vKHgX8wZZKaQCo2WHtmThdLx+mcVvlBa5u3XShC7ffbETJD4BiQ==}
+    peerDependencies:
+      preact: '>= 10.25.0 || >=11.0.0-0'
 
   '@prefresh/babel-plugin@0.5.3':
     resolution: {integrity: sha512-57LX2SHs4BX2s1IwCjNzTE2OJeEepRCNf1VTEpbNcUyHfMO68eeOWGDIt4ob9aYlW6PEWZ1SuwNikuoIXANDtQ==}
@@ -1440,6 +1454,11 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  lucide-preact@0.576.0:
+    resolution: {integrity: sha512-qfbV5jlkBJAq/JKVFv2osBHwngNTb+R4H5BJhEEibKUdHY2sE8vCk9MXGUphowvS0a3WHM9Mxk4lyASdaZ0bUA==}
+    peerDependencies:
+      preact: ^10.27.2
+
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -2373,6 +2392,13 @@ snapshots:
       - rollup
       - supports-color
 
+  '@preact/signals-core@1.13.0': {}
+
+  '@preact/signals@2.8.1(preact@10.28.4)':
+    dependencies:
+      '@preact/signals-core': 1.13.0
+      preact: 10.28.4
+
   '@prefresh/babel-plugin@0.5.3': {}
 
   '@prefresh/core@1.5.9(preact@10.28.4)':
@@ -3301,6 +3327,10 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-preact@0.576.0(preact@10.28.4):
+    dependencies:
+      preact: 10.28.4
 
   magic-string@0.30.21:
     dependencies:

@@ -1,17 +1,57 @@
-import { useEffect, useRef, useState } from "preact/hooks";
-import type { initialData } from "@/src/types/scele";
+﻿import { useEffect, useRef, useState } from "preact/hooks";
+import type { InitialData } from "@/src/types/scele";
+import {
+	activeTab,
+	closeTab,
+	DashboardTab,
+	navigate,
+	openTabs,
+	Tab,
+} from "@/src/routing/router";
+
+import {
+	ChevronLeftIcon,
+	ChevronRightIcon,
+	LogOut,
+	Moon,
+	Sun,
+	XIcon,
+} from "lucide-preact";
+import { Scroll } from "lucide-preact";
+import { theme, toggleTheme } from "@/src/stores/theme";
 
 const MIN_W = 64;
 const MAX_W = 280;
 const COLLAPSE_THRESHOLD = 72;
 const DEFAULT_W = 192;
 
-const NAV_ITEMS = [
-	{ label: "Dashboard", href: "#" },
-	{ label: "Courses", href: "#" },
-];
+interface NavItemProps {
+	icon: preact.VNode;
+	label: string;
+	active?: boolean;
+	expanded: boolean;
+	onClick: () => void;
+}
 
-const Sidebar = ({ data }: { data: initialData }) => {
+const NavItem = ({ icon, label, active, expanded, onClick }: NavItemProps) => (
+	<button
+		type="button"
+		onClick={onClick}
+		title={!expanded ? label : undefined}
+		class={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-sm font-medium transition-colors overflow-hidden cursor-pointer ${
+			active
+				? "bg-accent-soft text-accent-fg"
+				: "text-content-secondary hover:bg-subtle hover:text-content"
+		}`}
+	>
+		<span class="shrink-0">{icon}</span>
+		{expanded && <span class="truncate text-left">{label}</span>}
+	</button>
+);
+
+// --- Sidebar ---
+
+const Sidebar = ({ data }: { data: InitialData }) => {
 	const [width, setWidth] = useState(DEFAULT_W);
 	const [animate, setAnimate] = useState(false);
 	const dragging = useRef(false);
@@ -20,22 +60,26 @@ const Sidebar = ({ data }: { data: initialData }) => {
 
 	const expanded = width > COLLAPSE_THRESHOLD;
 
+	// Reading .value auto-subscribes this component to signal updates
+	const currentTab = activeTab.value;
+	const tabs = openTabs.value;
+
+	const isActive = (tab: Tab) => {
+		return tab.url === currentTab.url;
+	};
+
 	useEffect(() => {
 		const onMouseMove = (e: MouseEvent) => {
 			if (!dragging.current) return;
 			const delta = e.clientX - startX.current;
-			const next = Math.min(
-				MAX_W,
-				Math.max(MIN_W, startW.current + delta),
-			);
-			setWidth(next);
+			setWidth(Math.min(MAX_W, Math.max(MIN_W, startW.current + delta)));
 		};
 		const onMouseUp = () => {
 			if (!dragging.current) return;
 			dragging.current = false;
 			document.body.style.cursor = "";
 			document.body.style.userSelect = "";
-			setWidth((w) => w);
+			setWidth((w) => (w < COLLAPSE_THRESHOLD ? MIN_W : w));
 		};
 		document.addEventListener("mousemove", onMouseMove);
 		document.addEventListener("mouseup", onMouseUp);
@@ -55,105 +99,163 @@ const Sidebar = ({ data }: { data: initialData }) => {
 		document.body.style.userSelect = "none";
 	};
 
+	const toggleCollapse = () => {
+		setAnimate(true);
+		setWidth((w) => (w > COLLAPSE_THRESHOLD ? MIN_W : DEFAULT_W));
+	};
+
 	return (
 		<aside
 			style={{ width: `${width}px` }}
-			class={`relative shrink-0 flex flex-col px-3 py-6 gap-6${animate ? " transition-[width] duration-200" : ""}`}
+			class={`relative shrink-0 flex flex-col py-4 gap-1 overflow-hidden ${animate ? " transition-[width] duration-200" : ""}`}
 		>
-			<button
-				onClick={() => {
-					setAnimate(true);
-					setWidth((w) =>
-						w > COLLAPSE_THRESHOLD ? MIN_W : DEFAULT_W,
-					);
-				}}
-				class="flex cursor-pointer items-center gap-2 px-2 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors overflow-hidden"
-			>
-				{expanded ? (
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-4 h-4"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path d="M15 18l-6-6 6-6" />
-					</svg>
-				) : (
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-4 h-4"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path d="M9 18l6-6-6-6" />
-					</svg>
-				)}
-			</button>
+			{/* Brand + collapse */}
+			<div class="flex items-center justify-between px-3 pb-3 mb-1">
+				<button
+					type="button"
+					onClick={toggleCollapse}
+					aria-label={
+						expanded ? "Collapse sidebar" : "Expand sidebar"
+					}
+					class="shrink-0 p-1 rounded-md text-content-dim hover:text-content hover:bg-subtle transition-colors cursor-pointer"
+				>
+					{expanded ? (
+						<ChevronLeftIcon size={16} />
+					) : (
+						<ChevronRightIcon size={16} />
+					)}
+				</button>
+			</div>
 
-			{/* Nav */}
-			<nav class="flex flex-col gap-1 flex-1 overflow-hidden">
-				{NAV_ITEMS.map(({ label, href }) => (
-					<a
-						key={label}
-						href={href}
-						title={!expanded ? label : undefined}
-						class="flex items-center gap-2 px-2 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors overflow-hidden"
-					>
-						<span class="w-5 h-5 shrink-0 rounded bg-gray-200 inline-block" />
-						{expanded && <span class="truncate">{label}</span>}
-					</a>
-				))}
-			</nav>
+			<div class="px-2 flex flex-col gap-0.5">
+				<NavItem
+					icon={<Scroll size={16} />}
+					label="Dashboard"
+					active={isActive(DashboardTab)}
+					expanded={expanded}
+					onClick={() => navigate(DashboardTab)}
+				/>
+			</div>
 
-			<div class="border-t border-gray-100 pt-4 flex flex-col gap-1 overflow-hidden">
+			{tabs.length > 0 && (
+				<div class="flex flex-col px-2 mt-2">
+					{expanded && (
+						<p class="px-2 mb-1 text-xs font-medium text-content-dim uppercase tracking-wider">
+							Open
+						</p>
+					)}
+					{tabs.map((tab) => (
+						<div
+							key={tab.url}
+							class={`group flex items-center gap-1 rounded-lg overflow-hidden transition-colors ${
+								isActive(tab)
+									? "bg-accent-soft"
+									: "hover:bg-subtle"
+							}`}
+						>
+							<button
+								type="button"
+								onClick={() => navigate(tab)}
+								title={!expanded ? tab.title : undefined}
+								class={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-medium overflow-hidden cursor-pointer ${
+									isActive(tab)
+										? "text-accent-fg"
+										: "text-content-secondary"
+								}`}
+							>
+								<span class="shrink-0">
+									<Scroll size={16} />
+								</span>
+								{expanded && (
+									<span class="truncate text-left">
+										{tab.title}
+									</span>
+								)}
+							</button>
+							{expanded && (
+								<button
+									type="button"
+									onClick={(e) => {
+										e.stopPropagation();
+										closeTab(tab);
+									}}
+									class="shrink-0 mr-1 p-1 rounded text-content-dim hover:text-content-secondary hover:bg-subtle opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+									aria-label={`Close ${tab.title}`}
+								>
+									<XIcon size={16} />{" "}
+								</button>
+							)}
+						</div>
+					))}
+				</div>
+			)}
+
+			<div class="flex-1" />
+
+			<div class=" pt-3 px-2 flex flex-col gap-0.5">
 				{expanded ? (
 					<>
-						<p class="px-2 text-xs font-semibold text-gray-900 truncate">
+						<p class="px-2 text-xs font-semibold text-content truncate">
 							{data.username}
 						</p>
+						<button
+							type="button"
+							onClick={toggleTheme}
+							class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-content-secondary hover:text-content hover:bg-subtle transition-colors cursor-pointer"
+						>
+							<span class="shrink-0">
+								{theme.value === "dark" ? (
+									<Sun size={16} />
+								) : (
+									<Moon size={16} />
+								)}
+							</span>
+							{theme.value === "dark"
+								? "Light mode"
+								: "Dark mode"}
+						</button>
 						<a
 							href={data.logoutUrl}
-							class="px-2 text-xs text-red-500 hover:text-red-600 transition-colors"
+							class="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-danger hover:text-danger-hover hover:bg-danger-soft transition-colors"
 						>
+							<span class="shrink-0">
+								<LogOut size={16} />
+							</span>
 							Log out
 						</a>
 					</>
 				) : (
-					<a
-						href={data.logoutUrl}
-						title="Log out"
-						class="flex justify-center p-1 text-red-400 hover:text-red-600 transition-colors"
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="w-4 h-4"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
+					<>
+						<button
+							type="button"
+							onClick={toggleTheme}
+							title={
+								theme.value === "dark"
+									? "Light mode"
+									: "Dark mode"
+							}
+							class="flex justify-center p-1.5 rounded-lg text-content-secondary hover:text-content hover:bg-subtle transition-colors cursor-pointer"
 						>
-							<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-							<polyline points="16 17 21 12 16 7" />
-							<line x1="21" y1="12" x2="9" y2="12" />
-						</svg>
-					</a>
+							{theme.value === "dark" ? (
+								<Sun size={16} />
+							) : (
+								<Moon size={16} />
+							)}
+						</button>
+						<a
+							href={data.logoutUrl}
+							title="Log out"
+							class="flex justify-center p-1.5 rounded-lg text-danger hover:text-danger-hover hover:bg-danger-soft transition-colors cursor-pointer"
+						>
+							<LogOut size={16} />
+						</a>
+					</>
 				)}
 			</div>
 
-			{/* Drag handle */}
 			<div
 				onMouseDown={onDragHandleMouseDown}
-				class="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-gray-300 active:bg-gray-400 transition-colors"
+				class="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-edge-strong active:bg-accent transition-colors"
 			/>
 		</aside>
 	);
