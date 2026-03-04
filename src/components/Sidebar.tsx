@@ -8,6 +8,9 @@ import {
 	openTabs,
 	Tab,
 } from "@/src/routing/router";
+import { pinnedIds } from "@/src/stores/pins";
+import { courses } from "@/src/stores/courses";
+import { serverTime, formatServerTime } from "@/src/stores/serverTime";
 
 import {
 	ChevronLeftIcon,
@@ -16,6 +19,8 @@ import {
 	Moon,
 	Sun,
 	XIcon,
+	BookOpen,
+	Clock,
 } from "lucide-preact";
 import { Scroll } from "lucide-preact";
 import { theme, toggleTheme } from "@/src/stores/theme";
@@ -63,6 +68,11 @@ const Sidebar = ({ data }: { data: InitialData }) => {
 	// Reading .value auto-subscribes this component to signal updates
 	const currentTab = activeTab.value;
 	const tabs = openTabs.value;
+	const pinned = pinnedIds.value;
+	const allCourses = courses.value;
+
+	// Get pinned courses
+	const pinnedCourses = allCourses.filter((c) => pinned.has(c.id));
 
 	const isActive = (tab: Tab) => {
 		return tab.url === currentTab.url;
@@ -127,70 +137,128 @@ const Sidebar = ({ data }: { data: InitialData }) => {
 				</button>
 			</div>
 
-			<div class="px-2 flex flex-col gap-0.5">
-				<NavItem
-					icon={<Scroll size={16} />}
-					label="Dashboard"
-					active={isActive(DashboardTab)}
-					expanded={expanded}
-					onClick={() => navigate(DashboardTab)}
-				/>
-			</div>
+			{/* Scrollable navigation section - Dashboard + Pinned + Tabs */}
+			<div class="flex-1 overflow-y-auto pr-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-edge hover:scrollbar-thumb-muted">
+				<div class="px-2 flex flex-col gap-0.5">
+					<NavItem
+						icon={<Scroll size={16} />}
+						label="Dashboard"
+						active={isActive(DashboardTab)}
+						expanded={expanded}
+						onClick={() => navigate(DashboardTab)}
+					/>
+				</div>
 
-			{tabs.length > 0 && (
-				<div class="flex flex-col px-2 mt-2">
-					{expanded && (
-						<p class="px-2 mb-1 text-xs font-medium text-content-dim uppercase tracking-wider">
-							Tabs
-						</p>
-					)}
-					{tabs.map((tab) => (
-						<div
-							key={tab.url}
-							class={`group flex items-center gap-1 rounded-lg overflow-hidden transition-colors ${
-								isActive(tab)
-									? "bg-accent-soft"
-									: "hover:bg-subtle"
-							}`}
-						>
-							<button
-								type="button"
-								onClick={() => navigate(tab)}
-								title={!expanded ? tab.title : undefined}
-								class={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-medium overflow-hidden cursor-pointer ${
+				{pinnedCourses.length > 0 && (
+					<div class="flex flex-col px-2 mt-2">
+						{expanded && (
+							<p class="px-2 mb-1 text-xs font-medium text-content-dim uppercase tracking-wider">
+								Pinned
+							</p>
+						)}
+						{pinnedCourses.map((course) => {
+							const tab: Tab = {
+								type: "course",
+								url: course.url,
+								title: course.name,
+							};
+							return (
+								<button
+									key={course.id}
+									type="button"
+									onClick={() => navigate(tab)}
+									title={!expanded ? course.name : undefined}
+									class={`flex items-center gap-2 px-2 py-2 rounded-lg text-sm font-medium overflow-hidden cursor-pointer transition-colors ${
+										isActive(tab)
+											? "bg-accent-soft text-accent-fg"
+											: "text-content-secondary hover:bg-subtle hover:text-content"
+									}`}
+								>
+									<span class="shrink-0">
+										<BookOpen size={16} />
+									</span>
+									{expanded && (
+										<span class="truncate text-left">
+											{course.name}
+										</span>
+									)}
+								</button>
+							);
+						})}
+					</div>
+				)}
+
+				{tabs.length > 0 && (
+					<div class="flex flex-col px-2 mt-2">
+						{expanded && (
+							<p class="px-2 mb-1 text-xs font-medium text-content-dim uppercase tracking-wider">
+								Tabs
+							</p>
+						)}
+						{tabs.map((tab) => (
+							<div
+								key={tab.url}
+								class={`group flex items-center gap-1 rounded-lg overflow-hidden transition-colors ${
 									isActive(tab)
-										? "text-accent-fg"
-										: "text-content-secondary"
+										? "bg-accent-soft"
+										: "hover:bg-subtle"
 								}`}
 							>
-								<span class="shrink-0">
-									<Scroll size={16} />
-								</span>
-								{expanded && (
-									<span class="truncate text-left">
-										{tab.title}
-									</span>
-								)}
-							</button>
-							{expanded && (
 								<button
 									type="button"
-									onClick={(e) => {
-										e.stopPropagation();
-										closeTab(tab);
-									}}
-									class="shrink-0 mr-1 p-1 rounded text-content-dim hover:text-content-secondary hover:bg-subtle opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-									aria-label={`Close ${tab.title}`}
+									onClick={() => navigate(tab)}
+									title={!expanded ? tab.title : undefined}
+									class={`flex-1 flex items-center gap-2 px-2 py-2 text-sm font-medium overflow-hidden cursor-pointer ${
+										isActive(tab)
+											? "text-accent-fg"
+											: "text-content-secondary"
+									}`}
 								>
-									<XIcon size={16} />{" "}
+									<span class="shrink-0">
+										<Scroll size={16} />
+									</span>
+									{expanded && (
+										<span class="truncate text-left">
+											{tab.title}
+										</span>
+									)}
 								</button>
-							)}
-						</div>
-					))}
+								{expanded && (
+									<button
+										type="button"
+										onClick={(e) => {
+											e.stopPropagation();
+											closeTab(tab);
+										}}
+										class="shrink-0 mr-1 p-1 rounded text-content-dim hover:text-content-secondary hover:bg-subtle opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+										aria-label={`Close ${tab.title}`}
+									>
+										<XIcon size={16} />{" "}
+									</button>
+								)}
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			{/* Server time */}
+			{expanded && (
+				<div class="px-2 mb-3 py-2 rounded-lg bg-subtle border border-edge">
+					<div class="flex items-center gap-1.5 mb-1">
+						<Clock
+							size={12}
+							class="text-content-dim flex-shrink-0"
+						/>
+						<p class="text-[10px] font-medium text-content-dim uppercase tracking-wider">
+							Server Time
+						</p>
+					</div>
+					<p class="text-xs font-mono font-semibold text-content">
+						{formatServerTime(true)}
+					</p>
 				</div>
 			)}
-
-			<div class="flex-1" />
 
 			<div class=" pt-3 px-2 flex flex-col gap-0.5">
 				{expanded ? (

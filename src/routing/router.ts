@@ -1,5 +1,6 @@
 import { effect, signal } from "@preact/signals";
 import { openTabsStorage } from "../storage";
+import { pinnedIds } from "../stores/pins";
 import { SCELE_URL } from "../config";
 
 export type TabType = "course" | "dashboard" | "settings";
@@ -50,6 +51,12 @@ effect(() => {
 
 const addToOpenTabs = (tab: Tab) => {
 	if (tab.type === "dashboard") return;
+
+	const courseIdMatch = tab.url.match(/[?&]id=(\d+)/);
+	const courseId = courseIdMatch?.[1];
+
+	if (courseId && pinnedIds.value.has(courseId)) return;
+
 	if (!openTabs.value.some((t) => t.url === tab.url)) {
 		openTabs.value = [...openTabs.value, tab];
 	}

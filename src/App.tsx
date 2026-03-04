@@ -4,6 +4,7 @@ import type { InitialData } from "./types/scele";
 import { loadPins } from "./stores/pins";
 import { loadCourses } from "./stores/courses";
 import { loadTheme } from "./stores/theme";
+import { loadServerTime } from "./stores/serverTime";
 import { useEffect } from "preact/hooks";
 import DashboardPage from "./pages/DashboardPage";
 import { activeTab, initNavigation, loadOpenTabs } from "./routing/router";
@@ -30,6 +31,7 @@ const App = ({ data }: { data: InitialData }) => {
 		loadPins();
 		loadOpenTabs();
 		loadTheme();
+		loadServerTime();
 		initNavigation();
 	}, []);
 

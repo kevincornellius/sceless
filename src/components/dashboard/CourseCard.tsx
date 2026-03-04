@@ -1,7 +1,7 @@
 import { BookOpen, ChevronRight, Pin } from "lucide-preact";
 import type { Course } from "../../types/scele";
 import { isPinned, togglePin } from "../../stores/pins";
-import { navigate, Tab } from "@/src/routing/router";
+import { navigate, Tab, closeTab, openTabs } from "@/src/routing/router";
 
 interface CourseCardProps {
 	course: Course;
@@ -30,7 +30,18 @@ export default function CourseCard({ course }: CourseCardProps) {
 				type="button"
 				onClick={(e) => {
 					e.stopPropagation();
+					const willPin = !pinned;
 					togglePin(course.id);
+
+					// If pinning and course is in openTabs, remove it
+					if (willPin) {
+						const tab = openTabs.value.find(
+							(t) => t.url === course.url,
+						);
+						if (tab) {
+							closeTab(tab);
+						}
+					}
 				}}
 				className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all cursor-pointer ${
 					pinned
