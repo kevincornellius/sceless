@@ -11,22 +11,21 @@ export default defineContentScript({
 	cssInjectionMode: "manual",
 
 	async main() {
-		// Synchronously hide the page before any paint to prevent FOUC.
-		// document.head is null at document_start, so we use documentElement directly.
+		
+		const enabled = (await enabledStorage.getValue()) ?? true;
+
+		if (!enabled) {
+			console.log("[sceless] Extension disabled. Skipping.");
+			return;
+		}
+
 		document.documentElement.style.setProperty(
 			"display",
 			"none",
 			"important",
 		);
 
-		const enabled = (await enabledStorage.getValue()) ?? true;
-
-		if (!enabled) {
-			document.documentElement.style.removeProperty("display"); // unhide — SCELE loads as normal
-			console.log("[sceless] Extension disabled. Skipping.");
-			return;
-		}
-
+		
 		console.log("[sceless] Content script loaded.");
 
 		const executePurge = () => {
@@ -56,10 +55,6 @@ export default defineContentScript({
 			}
 		};
 
-		if (document.readyState === "loading") {
-			document.addEventListener("DOMContentLoaded", executePurge);
-		} else {
-			executePurge();
-		}
+		executePurge();
 	},
 });

@@ -12,9 +12,11 @@ export function Layout({ children }: LayoutProps) {
 			<Sidebar />
 			<div class="flex flex-col w-full h-full">
 				<Navbar />
-				<main class="flex-1 overflow-y-auto bg-page mr-4 my-2 rounded-2xl border-2 border-edge">
-					<div class="p-6">{children}</div>
+				<div className="rounded-2xl overflow-hidden border-2 border-edge mr-4 mb-4 h-full">
+				<main className="flex-1 overflow-y-auto bg-page scrollbar-thin h-full">
+					{children}
 				</main>
+				</div>
 			</div>
 		</div>
 	);

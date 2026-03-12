@@ -1,5 +1,7 @@
 import { useState } from "preact/hooks";
 import { Logo } from "@/src/components/ui/Logo";
+import { authenticateMoodleWS } from "../data/adapter/moodlews/auth";
+import { saveToken } from "../stores/auth";
 
 export function LoginPage() {
     const [username, setUsername] = useState("");
@@ -14,8 +16,9 @@ export function LoginPage() {
         setIsLoading(true);
 
         try {
-            // await authenticateMoodleWS(username, password);
             console.log("Submitting:", { username});
+			const token = await authenticateMoodleWS(username, password);
+            await saveToken(token);
             
             
         } catch (err) {
@@ -86,7 +89,7 @@ export function LoginPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        class="mt-2 w-full py-2.5 bg-accent text-content-invert text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                        class="mt-2 w-full py-2.5 bg-primary hover:bg-primary/20 cursor-pointer text-content text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                         {isLoading ? "Authenticating..." : "Log In"}
                     </button>

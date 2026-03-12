@@ -1,5 +1,5 @@
 const Navbar = () => {
-	return <div class="h-8 w-full bg-panel"> Navbar</div>;
+	return <div class="h-12 w-full bg-panel"> Navbar</div>;
 };
 
 export default Navbar;

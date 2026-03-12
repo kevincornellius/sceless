@@ -55,7 +55,7 @@
 }
 
 .scrollbar-thin:hover::-webkit-scrollbar-thumb {
-  background: var(--color-text-muted);
+  background: var(--color-content-muted);
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {

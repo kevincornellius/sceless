@@ -1,10 +1,12 @@
-import { useEffect } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { Layout } from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
 import { initializeTheme } from "./stores/theme";
 import { initNavigation } from "./routing/router";
+import { initAuthStore, wsToken } from "./stores/auth";
+import { LoginPage } from "./pages/LoginPage";
 
 const PageContent = () => {
 	const [type, id] = activeTabKey.value?.split(":") || ["", ""];
@@ -20,21 +22,41 @@ const PageContent = () => {
 };
 
 const App = () => {
-	useEffect(() => {
-		initStore();
-		initializeTheme();
-		initNavigation();
-	}, []);
+    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-	// if (!data.isLoggedIn) {
-	// 	return <LoginPage />;
-	// }
+    useEffect(() => {
+        const prepareApp = async () => {
+            try {
+                await initAuthStore();
+                
+				initStore();
+				initNavigation();
+				initializeTheme();
 
-	return (
-		<Layout>
-			<PageContent />
-		</Layout>
-	);
+            } catch (e) {
+                console.error("Initialization failed", e);
+            } finally {
+                setIsCheckingAuth(false);
+            }
+        };
+
+        prepareApp();
+    }, []);
+
+    if (isCheckingAuth) {
+        return <div class="bg-page min-h-screen" />; 
+    }
+
+    if (!wsToken.value) {
+        return <LoginPage />;
+    }
+
+    return (
+        <Layout>
+            <PageContent />
+        </Layout>
+    );
 };
+
 
 export default App;

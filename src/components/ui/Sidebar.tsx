@@ -12,6 +12,7 @@ import {
 	ChevronLeft,
 	LayoutDashboardIcon,
 	Menu,
+	X,
 } from "lucide-preact";
 import { ACTION_TABS } from "@/src/constants/navigation";
 import { Tab } from "@/src/types/state";
@@ -98,28 +99,57 @@ const Sidebar = () => {
 		</div>
 	);
 
-	const TabBar = ({ tab, icon }: { tab: Tab; icon: any }) => {
+	const TabBar = ({ tab, icon, closable }: { tab: Tab; icon: any, closable: boolean }) => {
 		const key = getTabKey(tab);
 		const active = activeTabKey.value === key;
 		const Icon = icon;
 
 		return (
 			<div
-				key={key}
 				onClick={() => navigateTab(tab)}
-				class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+				class={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
 					active
 						? "bg-primary text-white"
 						: "text-content-muted hover:text-content hover:bg-primary/10"
 				}`}
 			>
 				<Icon width={18} class="shrink-0" />
-				{expanded && (
+				{expanded ? (
 					<>
-						<span class="flex-1 text-left truncate">
+						<span class="flex-1 text-left truncate pr-6">
 							{tab.title}
 						</span>
+						{closable && (
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									deleteTab(key);
+								}}
+								class={`absolute right-2 p-1 rounded-md ${
+									active 
+										? "text-white/70 hover:text-white hover:bg-white/20" 
+										: "text-content-muted hover:text-content hover:bg-primary/20"
+								} transition-all opacity-0 group-hover:opacity-100 flex items-center justify-center`}
+								aria-label={`Close ${tab.title} tab`}
+							>
+								<X width={14} />
+							</button>
+						)}
 					</>
+				) : (
+					closable && (
+						<button
+							onClick={(e) => {
+								e.stopPropagation();
+								deleteTab(key);
+							}}
+							class={`absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] flex items-center justify-center transition-all opacity-0 group-hover:opacity-100
+								bg-danger text-white hover:bg-danger/80`}
+							aria-label={`Close ${tab.title} tab`}
+						>
+							<X width={8} />
+						</button>
+					)
 				)}
 			</div>
 		);
@@ -135,7 +165,7 @@ const Sidebar = () => {
 				)}
 				<div class="flex flex-col gap-0.5 px-2">
 					{ACTION_TABS.map((tab) => (
-						<TabBar tab={tab} icon={LayoutDashboardIcon} />
+						<TabBar tab={tab} icon={LayoutDashboardIcon} closable={false} />
 					))}
 				</div>
 			</div>
@@ -160,6 +190,7 @@ const Sidebar = () => {
 							key={getTabKey(tab)}
 							tab={tab}
 							icon={BookOpen}
+							closable={true}
 						/>
 					))}
 				</div>
