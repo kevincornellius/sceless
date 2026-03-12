@@ -73,7 +73,7 @@ const Sidebar = () => {
 
 	const Top = () => (
 		<div
-			class={`px-3 flex ${expanded ? "" : "pt-2 flex-col gap-4"} justify-between items-center overflow-hidden`}
+			class={`px-4 flex ${expanded ? "" : "pt-2 flex-col gap-4"} justify-between items-center overflow-hidden`}
 		>
 			{expanded ? (
 				<Logo class="text-primary w-24 shrink-0" />
