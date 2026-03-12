@@ -1,34 +1,43 @@
-import { signal, effect } from "@preact/signals";
-import { themeStorage } from "../storage";
+import { signal } from "@preact/signals";
+import { defaultThemes, type ThemeConfig } from "../types/themes";
 
-export type Theme = "light" | "dark";
+export const theme = signal<ThemeConfig>(defaultThemes[0]);
+export const isThemeLoaded = signal(false);
 
-export const theme = signal<Theme>("light");
-
-let _loaded = false;
-
-const applyTheme = (t: Theme) => {
-	const root = document.getElementById("sceless-root");
-	if (!root) return;
-	root.classList.toggle("dark", t === "dark");
-};
-
-export const loadTheme = async () => {
-	if (_loaded) return;
-	_loaded = true;
-	const saved = (await themeStorage.getValue()) ?? "light";
-	theme.value = saved;
-	applyTheme(saved);
-};
-
-export const toggleTheme = () => {
-	theme.value = theme.value === "light" ? "dark" : "light";
-};
-
-// Persist + apply whenever theme changes
-effect(() => {
-	const t = theme.value;
-	if (!_loaded) return;
-	applyTheme(t);
-	themeStorage.setValue(t);
+export const themeStorage = storage.defineItem<ThemeConfig>("local:theme", {
+	defaultValue: defaultThemes[0],
 });
+
+const applyTheme = (t: ThemeConfig) => {
+	const root = document.documentElement;
+
+	root.style.setProperty("--theme-primary", t.primary);
+	root.style.setProperty("--theme-primary-dark", t.primaryDark);
+	root.style.setProperty("--theme-page", t.bg);
+	root.style.setProperty("--theme-page-secondary", t.bgSecondary);
+	root.style.setProperty("--theme-edge", t.border);
+	root.style.setProperty("--theme-content", t.text);
+	root.style.setProperty("--theme-content-muted", t.textMuted);
+	root.style.setProperty("--theme-highlight", t.highlight);
+	root.style.setProperty("--theme-success", t.success);
+	root.style.setProperty("--theme-danger", t.danger);
+};
+
+export const initializeTheme = async () => {
+	const initialTheme = await themeStorage.getValue();
+
+	theme.value = initialTheme;
+	applyTheme(initialTheme);
+	isThemeLoaded.value = true;
+
+	themeStorage.watch((newTheme) => {
+		if (newTheme) {
+			theme.value = newTheme;
+			applyTheme(newTheme);
+		}
+	});
+};
+
+export const changeTheme = async (newTheme: ThemeConfig) => {
+	await themeStorage.setValue(newTheme);
+};

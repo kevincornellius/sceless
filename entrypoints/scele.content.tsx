@@ -1,9 +1,8 @@
 import { render } from "preact";
 import App from "@/src/App";
-import { enabledStorage } from "@/src/storage";
-import { scrapeSceleData } from "@/src/utils/scraper";
 import { SCELE_EXCLUDES, SCELE_MATCHES } from "@/src/config";
 import tailwindCss from "@/src/assets/tailwind.css?inline";
+import { enabledStorage } from "@/src/storage";
 
 export default defineContentScript({
 	matches: SCELE_MATCHES,
@@ -35,7 +34,7 @@ export default defineContentScript({
 
 			window.stop();
 
-			const data = scrapeSceleData();
+			// Initialize data
 
 			document.body.innerHTML = '<div id="sceless-root"></div>';
 
@@ -53,7 +52,7 @@ export default defineContentScript({
 
 			const root = document.getElementById("sceless-root");
 			if (root) {
-				render(<App data={data} />, root);
+				render(<App />, root);
 			}
 		};
 

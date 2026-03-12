@@ -1,47 +1,38 @@
-import { LoginPage } from "./pages/LoginPage";
-import { Layout } from "./components/Layout";
-import type { InitialData } from "./types/scele";
-import { loadPins } from "./stores/pins";
-import { loadCourses } from "./stores/courses";
-import { loadTheme } from "./stores/theme";
-import { loadServerTime } from "./stores/serverTime";
 import { useEffect } from "preact/hooks";
+import { Layout } from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
-import { activeTab, initNavigation, loadOpenTabs } from "./routing/router";
-import { useComputed } from "@preact/signals";
+import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
+import { initializeTheme } from "./stores/theme";
+import { initNavigation } from "./routing/router";
 
-const PageContent = ({ data }: { data: InitialData }) => {
-	const page = useComputed(() => activeTab.value);
-	console.log("Active page from app.tsx:", page.value);
-	switch (page.value.type) {
+const PageContent = () => {
+	const [type, id] = activeTabKey.value?.split(":") || ["", ""];
+
+	switch (type) {
 		case "dashboard":
-			return <DashboardPage data={data} />;
-		case "course":
-			console.log("Rendering CourseDetailPage for URL:", page.value.url);
-			return <CourseDetailPage url={page.value.url} />;
+			return <DashboardPage />;
+		case "course": 
+			return <CourseDetailPage courseId={id} />;
 		default:
-			return <div class="p-6">Unknown page type</div>;
+			return <DashboardPage />;
 	}
 };
 
-const App = ({ data }: { data: InitialData }) => {
+const App = () => {
 	useEffect(() => {
-		loadCourses();
-		loadPins();
-		loadOpenTabs();
-		loadTheme();
-		loadServerTime();
+		initStore();
+		initializeTheme();
 		initNavigation();
 	}, []);
 
-	if (!data.isLoggedIn) {
-		return <LoginPage />;
-	}
+	// if (!data.isLoggedIn) {
+	// 	return <LoginPage />;
+	// }
 
 	return (
-		<Layout data={data}>
-			<PageContent data={data} />
+		<Layout>
+			<PageContent />
 		</Layout>
 	);
 };

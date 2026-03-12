@@ -4,7 +4,7 @@ import type {
 	ActivityType,
 	Topic,
 	UpcomingEvent,
-} from "../types/scele";
+} from "../../types/scele";
 
 export const scrapeSceleData = () => {
 	const logInButton = document.querySelector(".usermenu .login a");
