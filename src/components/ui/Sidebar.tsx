@@ -112,6 +112,7 @@ const Sidebar = () => {
 						? "bg-primary text-white"
 						: "text-content-muted hover:text-content hover:bg-primary/10"
 				}`}
+                title={tab.title}
 			>
 				<Icon width={18} class="shrink-0" />
 				{expanded ? (

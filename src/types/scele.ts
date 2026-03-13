@@ -10,3 +10,13 @@ export interface AppNotification {
     module: string;      
     courseId?: number;
 }
+
+export interface Deadline {
+    id: number;
+    title: string;          
+    courseCode: string;     
+    courseId: number;
+    dueTimestamp: number;   
+    url: string;          
+    module: string;        
+}

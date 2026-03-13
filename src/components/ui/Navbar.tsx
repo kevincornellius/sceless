@@ -74,6 +74,7 @@ function Notifications() {
                                     onClick={() => {
                                         window.open(notif.url, "_blank");
                                     }}
+                                    title={notif.title}
                                 >
                                     <div class="flex items-start gap-2">
                                         {!notif.isRead && (
