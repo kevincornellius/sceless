@@ -48,3 +48,8 @@ export async function forceRefreshSiteInfo(): Promise<Profile | null> {
 export async function clearSiteInfoCache(): Promise<void> {
   await db.delete("cache", CACHE_KEY);
 }
+
+export async function getUserId(): Promise<number | null> {
+  const cached = await getCachedSiteInfo();
+  return cached?.id ?? null;
+}
