@@ -2,7 +2,7 @@ import { Course } from "@/src/types/course";
 import { db } from "./db";
 
 const CACHE_KEY = "inprogress-courses";
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 export async function getCachedCourses(): Promise<Course[] | null> {
   return db.get<Course[]>("cache", CACHE_KEY);

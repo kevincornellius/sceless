@@ -1,5 +1,6 @@
 import { storage } from "#imports";
 import { signal } from "@preact/signals";
+import { clearSiteInfoCache } from "./indexeddb/siteinfo";
 
 export const wsToken = signal<string | null>(null);
 
@@ -20,4 +21,5 @@ export const saveToken = async (newToken: string) => {
 export const logout = async () => {
     await tokenStorage.setValue(null);  
     wsToken.value = null;
+    await clearSiteInfoCache();
 };

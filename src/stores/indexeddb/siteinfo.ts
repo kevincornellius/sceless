@@ -2,7 +2,7 @@ import type { Profile } from "@/src/types/profile";
 import { db } from "./db";
 
 const CACHE_KEY = "site-info";
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours - site info rarely changes
+// No TTL - cache persists until logout
 
 export async function getCachedSiteInfo(): Promise<Profile | null> {
   return db.get<Profile>("cache", CACHE_KEY);
@@ -12,14 +12,10 @@ export async function setCachedSiteInfo(info: Profile): Promise<void> {
   await db.set("cache", CACHE_KEY, info);
 }
 
-export async function getSiteInfoTimestamp(): Promise<number | null> {
-  return db.getTimestamp("cache", CACHE_KEY);
-}
-
 export async function isSiteInfoCacheValid(): Promise<boolean> {
-  const timestamp = await getSiteInfoTimestamp();
-  if (!timestamp) return false;
-  return Date.now() - timestamp < CACHE_TTL;
+  // Always valid - no TTL
+  const cached = await getCachedSiteInfo();
+  return cached !== null;
 }
 
 export async function refreshSiteInfo(): Promise<Profile | null> {
@@ -46,4 +42,9 @@ export async function loadSiteInfo(): Promise<{ info: Profile | null; isFromCach
 
 export async function forceRefreshSiteInfo(): Promise<Profile | null> {
   return refreshSiteInfo();
+}
+
+// Clear site info cache (call on logout)
+export async function clearSiteInfoCache(): Promise<void> {
+  await db.delete("cache", CACHE_KEY);
 }

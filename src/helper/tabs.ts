@@ -21,7 +21,7 @@ export function UrlToTab(urlString: string): Tab | null {
 		const path = url.pathname;
 		const id = url.searchParams.get("id");
 
-		if (path === "/" || path === "/my/") {
+		if (path === "/") {
 			return DashboardTab;
 		}
 

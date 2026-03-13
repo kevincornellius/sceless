@@ -112,5 +112,5 @@ export const DashboardTab: Tab = {
 	type: "dashboard",
 	id: "page",
 	title: "Dashboard",
-	url: `${SCELE_URL}/my/`,
+	url: `${SCELE_URL}/`,
 };
