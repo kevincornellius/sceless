@@ -190,7 +190,6 @@ function UserProfile({ profile }: UserProfileProps) {
 
 const Navbar = () => {
     const [profile, setProfile] = useState<ProfileType | null>(null);
-    const [notificationCount, setNotificationCount] = useState(0);
 
 	const [currentTime, setCurrentTime] = useState(new Date())
 	
@@ -210,7 +209,7 @@ const Navbar = () => {
     }, []);
 
     return (
-        <header class="h-14 flex items-center justify-between  w-full pr-8">
+        <header class="h-14 shrink-0 flex items-center justify-between w-full pr-8 pl-4">
 
 			<div className="relative hidden sm:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
@@ -224,7 +223,7 @@ const Navbar = () => {
 				 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-page border-edge border-2">
 					<Clock className="w-4 h-4 text-primary"/>
 					<span className="text-sm font-semibold text-content">{timeStr}</span>
-					<span className="text-xs font-medium text-content-muted">{dateStr}</span>
+					<span className="text-xs font-medium text-content-muted max-lg:hidden">{dateStr}</span>
 				</div>
 
 				  <Notifications />

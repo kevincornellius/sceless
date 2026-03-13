@@ -113,7 +113,7 @@ export default function DashboardPage() {
                             <div
                                 key={notif.id}
                                 onClick={() => window.open(notif.url, "_blank")}
-                                class={`p-3 bg-panel border border-edge rounded-lg cursor-pointer hover:border-accent transition-colors ${
+                                class={`p-3 bg-page border border-edge rounded-lg cursor-pointer hover:border-accent transition-colors ${
                                     !notif.isRead ? "bg-accent/5 border-accent/30" : ""
                                 }`}
                             >
