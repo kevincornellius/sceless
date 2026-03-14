@@ -24,6 +24,15 @@ export const add = async (tab: Tab) => {
 	}
 };
 
+// Replace all tabs with a single tab (for navbar search)
+export const replaceAllWith = async (tab: Tab) => {
+	const tabKey = getTabKey(tab);
+	console.log(`Replacing all tabs with: ${tabKey}`);
+	await tabsStorage.setValue([tab]);
+	activeTabKey.value = tabKey;
+	document.title = tab.title;
+};
+
 export const setActive = async (tabKey: string) => {
 	const tab = openTabs.value.find((t) => getTabKey(t) === tabKey);
 	if (!tab) {

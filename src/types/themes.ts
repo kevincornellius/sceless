@@ -15,7 +15,7 @@ export interface ThemeConfig {
 
 export const defaultThemes: ThemeConfig[] = [
 	{
-		name: "Duolingo",
+		name: "Sceless",
 		primary: "#58CC02",
 		primaryDark: "#46A302",
 		onPrimary: "#FFFFFF",

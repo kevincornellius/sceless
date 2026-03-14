@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect } from "preact/hooks";
 import {
 	BookOpen,
 	ChevronDown,
@@ -18,8 +18,16 @@ import {
 	CheckCircle,
 	Clock,
 } from "lucide-preact";
+import { Image } from "lucide-preact";
 import { SCELE_URL } from "../../config";
-import { CourseSection, CourseModule } from "../../types/course";
+import { CourseSection, CourseModule, getModuleDueDate, formatDueDate } from "../../types/course";
+
+function replaceImagesWithPlaceholder(html: string): string {
+	return html.replace(
+		/<img([^>]*)>/gi,
+		'<div class="flex items-center gap-2 p-2 my-2 bg-surface rounded-lg text-sm text-content-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>Image (not supported by Sceless)</span></div>'
+	);
+}
 
 // Module type to icon mapping
 const moduleIcons: Record<string, any> = {
@@ -96,8 +104,15 @@ export function ViewModeSelector({
 }
 
 // Chronological View
-export function ChronologicalView({ sections }: { sections: CourseSection[] }) {
-	const [expandedSections, setExpandedSections] = useState<number[]>(sections.map((s) => s.id));
+export function ChronologicalView({ sections, expandAll = false }: { sections: CourseSection[]; expandAll?: boolean }) {
+	const [expandedSections, setExpandedSections] = useState<number[]>(expandAll ? sections.map((s) => s.id) : []);
+
+	// Expand all when expandAll changes to true
+	useEffect(() => {
+		if (expandAll) {
+			setExpandedSections(sections.map((s) => s.id));
+		}
+	}, [expandAll, sections]);
 
 	const toggleSection = (id: number) => {
 		setExpandedSections((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
@@ -139,6 +154,13 @@ export function ChronologicalView({ sections }: { sections: CourseSection[] }) {
 
 						{expandedSections.includes(section.id) && (
 							<div class="divide-y-2 divide-edge">
+								{/* Summary */}
+								{section.summary && (
+									<div 
+										class="px-4 py-3 text-sm text-content-muted bg-page/50"
+										dangerouslySetInnerHTML={{ __html: replaceImagesWithPlaceholder(section.summary) }}
+									/>
+								)}
 								{moduleCount === 0 ? (
 									<div class="px-4 py-6 text-center text-sm text-content-muted">
 										No content in this section
@@ -158,8 +180,22 @@ export function ChronologicalView({ sections }: { sections: CourseSection[] }) {
 }
 
 // Grouped View
-export function GroupedView({ sections }: { sections: CourseSection[] }) {
-	const [expandedTypes, setExpandedTypes] = useState<string[]>(["resource", "assign", "forum"]);
+export function GroupedView({ sections, expandAll = false }: { sections: CourseSection[]; expandAll?: boolean }) {
+	// Get unique types from sections
+	const uniqueTypes = [...new Set(
+		sections
+			.filter((s) => s.visible)
+			.flatMap((s) => s.modules.filter((m) => m.visible).map((m) => m.modname.toLowerCase()))
+	)];
+
+	const [expandedTypes, setExpandedTypes] = useState<string[]>(expandAll ? uniqueTypes : []);
+
+	// Expand all when expandAll changes to true
+	useEffect(() => {
+		if (expandAll) {
+			setExpandedTypes(uniqueTypes);
+		}
+	}, [expandAll, uniqueTypes]);
 
 	const toggleType = (type: string) => {
 		setExpandedTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
@@ -251,6 +287,8 @@ function ModuleItem({
 }) {
 	const Icon = getModuleIcon(module.modname);
 	const modUrl = `${SCELE_URL}/mod/${module.modname}/view.php?id=${module.id}`;
+	const dueDate = getModuleDueDate(module);
+	const isOverdue = dueDate && dueDate < new Date();
 
 	return (
 		<a
@@ -268,6 +306,11 @@ function ModuleItem({
 				</div>
 				<p class="text-xs font-medium text-content-muted">{getModuleTypeLabel(module.modname)}{showSection && sectionName ? ` · ${sectionName}` : ""}</p>
 			</div>
+			{dueDate && (
+				<span class={`text-xs px-2 py-1 rounded-lg font-semibold flex-shrink-0 ${isOverdue ? "bg-danger text-white" : "bg-primary/20 text-primary"}`}>
+					{formatDueDate(dueDate)}
+				</span>
+			)}
 			{module.availability && module.availability.includes("unavailable") && (
 				<Lock class="w-4 h-4 text-content-muted flex-shrink-0" />
 			)}

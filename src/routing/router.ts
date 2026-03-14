@@ -51,7 +51,7 @@ export const getActiveTab = (): string | null => {
 
 let isInitialized = false;
 
-export const initNavigation = () => {
+export const initNavigation = async () => {
 	if (isInitialized) return;
 	isInitialized = true;
 

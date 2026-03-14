@@ -1,38 +1,44 @@
 
+import { signal } from "@preact/signals";
 import { loadSiteInfo } from "@/src/stores/indexeddb/siteinfo";
 import { loadNotifications } from "@/src/stores/indexeddb/notification";
+import { loadCourses, courses } from "@/src/stores/indexeddb/course";
+import { replaceAllWith } from "@/src/stores/tabs";
 import { useEffect, useState, useRef } from "preact/hooks";
+
+// Signal to track which navbar dropdown is open (for closing others)
+export const navbarDropdown = signal<"notifications" | "theme" | "profile" | null>(null);
+
+export const closeAllDropdowns = () => {
+    navbarDropdown.value = null;
+};
 import type { Profile as ProfileType } from "@/src/types/profile";
 import type { AppNotification } from "@/src/types/scele";
-import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette } from "lucide-preact";
+import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen } from "lucide-preact";
 import { logout } from "@/src/stores/auth";
 import { theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes, type ThemeConfig } from "@/src/types/themes";
+import { CourseDetailTab } from "@/src/pages/CourseDetailPage";
+import { navigateTab } from "@/src/routing/router";
 
 interface UserProfileProps {
     profile: ProfileType | null;
 }
 
 function Notifications() {
-    const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const dropdownRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, []);
 
     useEffect(() => {
         loadNotifications().then(({ notifications }) => {
             setNotifications(notifications);
         });
     }, []);
+
+    const isOpen = navbarDropdown.value === "notifications";
+    const setIsOpen = (open: boolean) => {
+        navbarDropdown.value = open ? "notifications" : null;
+    };
 
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
@@ -102,18 +108,12 @@ function Notifications() {
 }
 
 function ThemeSelector() {
-    const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, []);
+    const isOpen = navbarDropdown.value === "theme";
+    const setIsOpen = (open: boolean) => {
+        navbarDropdown.value = open ? "theme" : null;
+    };
 
     const currentTheme = defaultThemes.find(t => t.name === theme.value.name) || defaultThemes[0];
 
@@ -175,8 +175,12 @@ interface UserProfileProps {
 }
 
 function UserProfile({ profile }: UserProfileProps) {
-    const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const isOpen = navbarDropdown.value === "profile";
+    const setIsOpen = (open: boolean) => {
+        navbarDropdown.value = open ? "profile" : null;
+    };
 
     const initials = profile?.name
         ?.split(" ")
@@ -184,16 +188,6 @@ function UserProfile({ profile }: UserProfileProps) {
         .join("")
         .toUpperCase()
         .slice(0, 2) ?? "?";
-
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, []);
 
     const handleLogout = async () => {
         await logout();
@@ -261,6 +255,9 @@ function UserProfile({ profile }: UserProfileProps) {
 
 const Navbar = () => {
     const [profile, setProfile] = useState<ProfileType | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
 
 	const [currentTime, setCurrentTime] = useState(new Date())
 	
@@ -272,24 +269,74 @@ const Navbar = () => {
 	const timeStr = currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second:'2-digit' })
 	const dateStr = currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
+    // Filter courses based on search
+    const filteredCourses = searchQuery.trim()
+        ? courses.value.filter(c => 
+            c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.code.toLowerCase().includes(searchQuery.toLowerCase())
+          ).slice(0, 5)
+        : [];
+
+    const handleCourseClick = async (courseId: number, courseTitle: string) => {
+        const tab = CourseDetailTab(courseId.toString(), courseTitle);
+        navigateTab(tab);
+        setSearchQuery("");
+        setIsSearchOpen(false);
+        closeAllDropdowns();
+    };
+    
+    const handleSearchFocus = () => {
+        setIsSearchOpen(true);
+    };
+
+    const handleSearchInput = (e: Event) => {
+        setSearchQuery((e.target as HTMLInputElement).value);
+        setIsSearchOpen(true);
+    };
 	
     useEffect(() => {
         loadSiteInfo().then(({ info }) => {
             if (info) setProfile(info);
         });
+        loadCourses(); // Load courses globally for course title lookup
     }, []);
 
     return (
         <header class="h-14 shrink-0 flex items-center justify-between w-full pr-8">
 
-			<div className="relative hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
-          <input 
-            type="text" 
-            placeholder="Search courses, tasks..." 
-            className="w-64 lg:w-72 pl-9 pr-3 py-2 rounded-lg text-sm border-2 transition-all focus:outline-none bg-page text-content border-edge focus:border-accent focus:ring-1 focus:ring-accent"
-          />
-        </div>
+			<div className="relative hidden sm:block" ref={searchRef}>
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
+                <input 
+                    type="text" 
+                    placeholder="Search courses..." 
+                    value={searchQuery}
+                    onInput={(e) => {
+                        setSearchQuery((e.target as HTMLInputElement).value);
+                        setIsSearchOpen(true);
+                    }}
+                    onFocus={() => setIsSearchOpen(true)}
+                    className="w-64 lg:w-72 pl-9 pr-3 py-2 rounded-lg text-sm border-2 transition-all focus:outline-none bg-page text-content border-edge focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+                
+                {/* Search Results Dropdown */}
+                {isSearchOpen && filteredCourses.length > 0 && (
+                    <div class="absolute top-full mt-2 w-full bg-page border border-edge rounded-lg shadow-lg overflow-hidden z-50">
+                        {filteredCourses.map(course => (
+                            <button
+                                key={course.id}
+                                onClick={() => handleCourseClick(course.id, course.title)}
+                                class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-primary/10 transition-colors"
+                            >
+                                <BookOpen class="w-4 h-4 text-content-muted" />
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-content truncate">{course.title}</div>
+                                    <div class="text-xs text-content-muted">{course.code}</div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+        	</div>
 			<div class="flex items-center gap-2">
 				 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-page border-edge border-2">
 					<Clock className="w-4 h-4 text-primary"/>

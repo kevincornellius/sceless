@@ -9,6 +9,7 @@ import { initAuthStore, wsToken } from "./stores/auth";
 import { LoginPage } from "./pages/LoginPage";
 import type { ComponentChildren } from "preact";
 import { UrlToTab } from "./helper/tabs";
+import { loadCourses } from "./stores/indexeddb/course";
 
 const getPageFromActiveTabKey = (): ComponentChildren => {
 	const key = activeTabKey.value;
@@ -37,10 +38,10 @@ const App = () => {
         const prepareApp = async () => {
             try {
                 await initAuthStore();
-                
-				await initStore();
+                await initStore();
 				await initializeTheme();
-				initNavigation();
+				await loadCourses();
+                initNavigation();
                 await navigateTab(UrlToTab(window.location.href) || DashboardTab);
 
             } catch (e) {
