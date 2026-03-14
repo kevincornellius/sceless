@@ -55,6 +55,10 @@ export default defineContentScript({
 			}
 		};
 
-		executePurge();
+		if (document.body) {
+			executePurge();
+		} else {
+			document.addEventListener("DOMContentLoaded", executePurge);
+		}
 	},
 });

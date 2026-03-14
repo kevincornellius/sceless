@@ -1,4 +1,4 @@
-import { Course } from "@/src/types/course";
+import { Course, CourseSection } from "@/src/types/course";
 import { fetchMoodle } from "./fetch";
 
 export interface MoodleCourse {
@@ -47,4 +47,17 @@ export async function getInprogressCourses(): Promise<Course[]> {
         isPinned: c.isfavourite,
         image: c.courseimage
     }));
+}
+
+export async function getCourseContents(courseId: number): Promise<CourseSection[]> {
+    const data = await fetchMoodle<CourseSection[]>(
+        "core_course_get_contents",
+        { courseid: courseId }
+    );
+
+    if (!data) {
+        return [];
+    }
+
+    return data;
 }

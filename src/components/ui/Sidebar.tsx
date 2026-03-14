@@ -1,4 +1,5 @@
 ﻿import { deleteTab, navigateTab } from "@/src/routing/router";
+import { TabToUrl } from "@/src/helper/tabs";
 import {
 	activeTabKey,
 	getTabKey,
@@ -104,9 +105,29 @@ const Sidebar = () => {
 		const active = activeTabKey.value === key;
 		const Icon = icon;
 
+		const handleClick = (e: MouseEvent) => {
+			// Open in new tab with ctrl/cmd key
+			if (e.ctrlKey || e.metaKey) {
+				e.preventDefault();
+				const url = TabToUrl(tab);
+				window.open(url, "_blank");
+				return;
+			}
+			// Prevent navigation if clicking on close button
+			if ((e.target as HTMLElement).closest("button")) {
+				return;
+			}
+			navigateTab(tab);
+		};
+
 		return (
-			<div
-				onClick={() => navigateTab(tab)}
+			<a
+				href={TabToUrl(tab)}
+				onClick={(e) => {
+					e.preventDefault();
+					handleClick(e);
+				}}
+				target="_blank"
 				class={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
 					active
 						? "bg-primary text-on-primary"
@@ -123,6 +144,7 @@ const Sidebar = () => {
 						{closable && (
 							<button
 								onClick={(e) => {
+									e.preventDefault();
 									e.stopPropagation();
 									deleteTab(key);
 								}}
@@ -141,6 +163,7 @@ const Sidebar = () => {
 					closable && (
 						<button
 							onClick={(e) => {
+								e.preventDefault();
 								e.stopPropagation();
 								deleteTab(key);
 							}}
@@ -152,7 +175,7 @@ const Sidebar = () => {
 						</button>
 					)
 				)}
-			</div>
+			</a>
 		);
 	};
 

@@ -6,7 +6,6 @@ import { DashboardTab } from "../pages/DashboardPage";
 export const openTabs = signal<Tab[]>([]);
 export const activeTabKey = signal<string | null>(null);
 export const openTabsLoaded = signal(false);
-export const activeTabsLoaded = signal(false);
 
 export const getTabKey = (tab: Tab) => `${tab.type}:${tab.id}`;
 export const tabsStorage = storage.defineItem<Tab[]>("local:tabs", {
@@ -15,76 +14,63 @@ export const tabsStorage = storage.defineItem<Tab[]>("local:tabs", {
 
 const FALLBACK_TAB_KEY = getTabKey(DashboardTab);
 
-export const activeTabStorage = storage.defineItem<string | null>(
-	"local:activeTab",
-	{
-		defaultValue: null,
-	},
-);
-
 export const add = async (tab: Tab) => {
 	const tabKey = getTabKey(tab);
 	const exists = openTabs.value.some((t) => getTabKey(t) === tabKey);
 
 	if (!exists) {
+		console.log(`Adding new tab: ${tabKey}`);
 		await tabsStorage.setValue([...openTabs.value, tab]);
 	}
 };
 
 export const setActive = async (tabKey: string) => {
-	if (!openTabs.value.some((t) => getTabKey(t) === tabKey)) {
+	const tab = openTabs.value.find((t) => getTabKey(t) === tabKey);
+	if (!tab) {
 		console.warn(`Tab with key ${tabKey} does not exist.`);
 		return;
 	}
 
-	await activeTabStorage.setValue(tabKey);
+	activeTabKey.value = tabKey;
+	document.title = tab.title;
 };
 
 export const remove = async (tabKey: string) => {
-	const closedIndex = openTabs.value.findIndex(
-		(t) => getTabKey(t) === tabKey,
-	);
-
-	if (closedIndex === -1) return;
-
-	const fallbackTab =
-		(closedIndex < openTabs.value.length - 1
-			? openTabs.value[closedIndex + 1]
-			: openTabs.value[closedIndex - 1]) || null;
-
+	
 	const newTabs = openTabs.value.filter((t) => getTabKey(t) !== tabKey);
 	await tabsStorage.setValue(newTabs);
 
-	if (activeTabKey.value === tabKey) {
-		await activeTabStorage.setValue(
-			fallbackTab ? getTabKey(fallbackTab) : FALLBACK_TAB_KEY,
-		);
-	}
+	
 };
 
 export async function initStore() {
-	const [initialTabs, initialActiveTab] = await Promise.all([
-		tabsStorage.getValue(),
-		activeTabStorage.getValue(),
-	]);
+	const initialTabs = await tabsStorage.getValue();
 
 	openTabs.value = initialTabs;
-	activeTabKey.value = initialActiveTab;
+
+	// Set default active tab if none exists
+	const fallbackTab = initialTabs.length > 0 ? initialTabs[0] : DashboardTab;
+	if (!activeTabKey.value && initialTabs.length > 0) {
+		activeTabKey.value = getTabKey(initialTabs[0]);
+	} else if (!activeTabKey.value) {
+		activeTabKey.value = FALLBACK_TAB_KEY;
+	}
+
+	// Set initial document title
+	const activeTab = openTabs.value.find(
+		(t) => getTabKey(t) === activeTabKey.value,
+	);
+	document.title = activeTab?.title ?? "Sceless";
 
 	console.log(
 		"Initialized tabs store with tabs:",
 		initialTabs,
 		"and active tab:",
-		initialActiveTab,
+		activeTabKey.value,
 	);
 	openTabsLoaded.value = true;
-	activeTabsLoaded.value = true;
 
 	tabsStorage.watch((newTabs) => {
 		openTabs.value = newTabs ?? [];
-	});
-
-	activeTabStorage.watch((newActiveTab) => {
-		activeTabKey.value = newActiveTab;
 	});
 }
