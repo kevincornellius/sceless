@@ -40,7 +40,7 @@ export async function getInprogressCourses(): Promise<Course[]> {
 
     return data.courses.map(c => ({
         id: c.id,
-        title: c.fullname,
+        title: c.fullname.replace(/^\[.*?\]\s*/, ""),
         code: c.shortname,
         url: c.viewurl,
         progress: c.progress ?? 0,

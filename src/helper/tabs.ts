@@ -7,7 +7,7 @@ export function TabToUrl(tab: Tab): string {
 	const route = () => {
 		switch (tab.type) {
 			case "dashboard":
-				return "my";
+				return "";
 			case "course":
 				return `course/view.php?id=${tab.id}`;
 		}

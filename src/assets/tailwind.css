@@ -18,8 +18,7 @@
 
 @import "tailwindcss";
 
-
-/* ── Semantic color palette ────────────────────────────────── */
+/* Semantic color palette */
 @theme inline {
   --color-primary: var(--theme-primary, #58cc02);
   --color-primary-dark: var(--theme-primary-dark, #46a302);
@@ -31,17 +30,20 @@
   --color-highlight: var(--theme-highlight, #ffc800);
   --color-success: var(--theme-success, #58cc02);
   --color-danger: var(--theme-danger, #ff4b4b);
-
+  --color-accent: var(--theme-accent, #ff4b4b);
+  --color-on-primary: var(--theme-on-primary, #ffffff);
 }
 
-#sceless-root {
-  font-family: 'Inter', sans-serif;
+/* Register scrollbar-thin as a custom utility */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-edge) transparent;
 }
 
-
-/* ── Custom scrollbar styling ──────────────────────────────── */
+/* Webkit scrollbar needs separate rules - uses CSS variables for theme support */
 .scrollbar-thin::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
@@ -49,15 +51,14 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--color-edge);
-  border-radius: 4px;
-  transition: background 0.2s;
+  background: var(--theme-edge);
+  border-radius: 3px;
 }
 
 .scrollbar-thin:hover::-webkit-scrollbar-thumb {
-  background: var(--color-content-muted);
+  background: var(--theme-edge);
 }
 
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary-dark);
+#sceless-root {
+  font-family: 'Inter', sans-serif;
 }

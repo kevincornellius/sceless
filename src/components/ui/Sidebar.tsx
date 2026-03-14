@@ -109,7 +109,7 @@ const Sidebar = () => {
 				onClick={() => navigateTab(tab)}
 				class={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
 					active
-						? "bg-primary text-white"
+						? "bg-primary text-on-primary"
 						: "text-content-muted hover:text-content hover:bg-primary/10"
 				}`}
                 title={tab.title}
@@ -212,7 +212,7 @@ const Sidebar = () => {
 				onMouseDown={handleMouseDown}
 				class={`absolute top-0 right-0 h-full w-1 transition-colors ${
 					expanded
-						? "cursor-col-resize hover:bg-edge-strong active:bg-accent"
+						? "cursor-col-resize hover:bg-edge active:bg-primary"
 						: "pointer-events-none opacity-0"
 				}`}
 			/>

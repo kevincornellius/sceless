@@ -13,6 +13,7 @@ const applyTheme = (t: ThemeConfig) => {
 
 	root.style.setProperty("--theme-primary", t.primary);
 	root.style.setProperty("--theme-primary-dark", t.primaryDark);
+	root.style.setProperty("--theme-on-primary", t.onPrimary);
 	root.style.setProperty("--theme-page", t.bg);
 	root.style.setProperty("--theme-page-secondary", t.bgSecondary);
 	root.style.setProperty("--theme-edge", t.border);

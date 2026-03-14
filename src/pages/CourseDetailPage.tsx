@@ -2,7 +2,7 @@ import { SCELE_URL } from "../config";
 import { Tab } from "../types/state";
 
 const CourseDetailPage = ({ courseId }: { courseId: string }) => {
-	return <div>This is the course detail page for course {courseId}</div>;
+	return <div class="">This is the course detail page for course {courseId}</div>;
 };
 
 export default CourseDetailPage;

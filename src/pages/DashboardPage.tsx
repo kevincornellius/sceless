@@ -9,7 +9,8 @@ import { loadDeadlines, forceRefreshDeadlines } from "../stores/indexeddb/deadli
 import { loadNotifications } from "../stores/indexeddb/notification";
 import { Deadline } from "../types/scele";
 import { AppNotification } from "../types/scele";
-import { Clock, Bell, AlertCircle } from "lucide-preact";
+import { Clock, Bell, AlertCircle, Pin, BookOpen, CheckCircle, MessageSquare, Calendar, Star, ChevronRight, FileText } from "lucide-preact";
+import { pinnedCourses, togglePin, initPinnedCoursesStore, isPinned } from "../stores/pinned";
 
 export default function DashboardPage() {
     const [courses, setCourses] = useState<Course[]>([]);
@@ -19,6 +20,27 @@ export default function DashboardPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Stats
+    const dueToday = deadlines.filter(d => {
+        const now = Date.now();
+        const due = d.dueTimestamp * 1000;
+        const todayEnd = new Date().setHours(23, 59, 59, 999);
+        return due <= todayEnd && due >= now;
+    }).length;
+    
+    const dueThisWeek = deadlines.filter(d => {
+        const now = Date.now();
+        const due = d.dueTimestamp * 1000;
+        const weekEnd = now + 7 * 24 * 60 * 60 * 1000;
+        return due > now && due <= weekEnd;
+    }).length;
+
+    const unreadNotifs = notifications.filter(n => !n.isRead).length;
+
+    useEffect(() => {
+        initPinnedCoursesStore();
+    }, []);
+
     useEffect(() => {
         const init = async () => {
             try {
@@ -27,7 +49,22 @@ export default function DashboardPage() {
                     loadDeadlines(),
                     loadNotifications(),
                 ]);
-                setCourses(coursesResult.courses);
+                
+                // Merge pinned status from storage
+                const pinnedIds = new Set(pinnedCourses.value.map(c => c.id));
+                const coursesWithPinned = coursesResult.courses.map(c => ({
+                    ...c,
+                    isPinned: pinnedIds.has(c.id),
+                }));
+                
+                // Sort: pinned first
+                const sortedCourses = coursesWithPinned.sort((a, b) => {
+                    if (a.isPinned && !b.isPinned) return -1;
+                    if (!a.isPinned && b.isPinned) return 1;
+                    return 0;
+                });
+                
+                setCourses(sortedCourses);
                 setDeadlines(deadlinesResult.deadlines);
                 setNotifications(notificationsResult.notifications);
             } catch (err: any) {
@@ -47,7 +84,22 @@ export default function DashboardPage() {
                 forceRefreshDeadlines(),
                 loadNotifications(),
             ]);
-            setCourses(coursesResult);
+            
+            // Merge pinned status from storage
+            const pinnedIds = new Set(pinnedCourses.value.map(c => c.id));
+            const coursesWithPinned = coursesResult.map(c => ({
+                ...c,
+                isPinned: pinnedIds.has(c.id),
+            }));
+            
+            // Sort: pinned first
+            const sortedCourses = coursesWithPinned.sort((a, b) => {
+                if (a.isPinned && !b.isPinned) return -1;
+                if (!a.isPinned && b.isPinned) return 1;
+                return 0;
+            });
+            
+            setCourses(sortedCourses);
             setDeadlines(deadlinesResult);
             setNotifications(notificationsResult.notifications);
         } catch (err: any) {
@@ -71,137 +123,251 @@ export default function DashboardPage() {
     };
 
     return (
-        <div class="p-6 space-y-6">
-            {/* Deadlines Section */}
-            {deadlines.length > 0 && (
-                <div>
-                    <div class="flex items-center gap-2 mb-3">
-                        <AlertCircle class="w-5 h-5 text-danger" />
-                        <h2 class="text-lg font-bold text-content">Upcoming Deadlines</h2>
-                    </div>
-                    <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-                        {deadlines.slice(0, 5).map((deadline) => (
-                            <div
-                                key={deadline.id}
-                                onClick={() => window.open(deadline.url, "_blank")}
-                                class="shrink-0 w-48 p-3 bg-danger/10 border border-danger/20 rounded-lg cursor-pointer hover:bg-danger/20 transition-colors"
-                            >
-                                <div class="text-xs font-bold text-danger uppercase mb-1">
-                                    {deadline.courseCode}
-                                </div>
-                                <div class="text-sm font-medium text-content truncate" title={deadline.title}>
-                                    {deadline.title}
-                                </div>
-                                <div class="text-xs text-danger mt-2 font-semibold">
-                                    {formatDueDate(deadline.dueTimestamp * 1000)}
-                                </div>
-                            </div>
-                        ))}
+        <div class="p-4 lg:p-6 h-full overflow-y-auto">
+            {/* Stats Strip */}
+            <div class="flex gap-2 mb-4 overflow-x-auto scrollbar-thin">
+                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 bg-primary text-on-primary border-primary">
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl font-bold">{dueToday}</span>
+                        <span class="text-xs font-semibold opacity-80">Due Today</span>
                     </div>
                 </div>
-            )}
-
-            {/* Notifications Section */}
-            {notifications.length > 0 && (
-                <div>
-                    <div class="flex items-center gap-2 mb-3">
-                        <Bell class="w-5 h-5 text-accent" />
-                        <h2 class="text-lg font-bold text-content">Recent Notifications</h2>
+                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 bg-page border-edge">
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl font-bold text-content">{dueThisWeek}</span>
+                        <span class="text-xs font-semibold text-content-muted">Due This Week</span>
                     </div>
-                    <div class="space-y-2">
-                        {notifications.slice(0, 5).map((notif) => (
-                            <div
-                                key={notif.id}
-                                onClick={() => window.open(notif.url, "_blank")}
-                                class={`p-3 bg-page border border-edge rounded-lg cursor-pointer hover:border-accent transition-colors ${
-                                    !notif.isRead ? "bg-accent/5 border-accent/30" : ""
-                                }`}
-                            >
-                                <div class="flex items-start gap-2">
-                                    {!notif.isRead && (
-                                        <span class="w-2 h-2 rounded-full bg-accent mt-1.5 shrink-0" />
-                                    )}
+                </div>
+                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 bg-page border-edge">
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl font-bold text-content">{unreadNotifs}</span>
+                        <span class="text-xs font-semibold text-content-muted">Unread</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* 2-Column Layout */}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Left Column - Wide */}
+                <div class="lg:col-span-2 space-y-4">
+                    {/* Pinned Courses */}
+                    {pinnedCourses.value.length > 0 && (
+                        <div>
+                            <div class="flex items-center gap-2 mb-3">
+                                <Star class="w-4 h-4 text-highlight fill-current" />
+                                <h3 class="font-semibold text-sm text-content">Pinned Courses</h3>
+                                <span class="text-xs px-2 py-0.5 rounded-lg font-semibold bg-primary/20 text-primary">
+                                    {pinnedCourses.value.length}
+                                </span>
+                            </div>
+                            <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                                {pinnedCourses.value.map((course) => (
+                                    <div
+                                        key={course.id}
+                                        class="group relative flex-shrink-0 w-64 rounded-xl border-2 border-edge p-4 cursor-pointer bg-page hover:border-primary transition-colors"
+                                        onClick={() => navigateTab(CourseDetailTab(String(course.id), course.title))}
+                                    >
+                                        <div class="flex items-start gap-3 mb-3">
+                                            <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-primary shrink-0">
+                                                <BookOpen class="w-5 h-5 text-on-primary" />
+                                            </div>
+                                            <div class="flex-1 min-w-0 overflow-hidden">
+                                                <p class="font-semibold text-sm text-content truncate" title={course.title}>({course.title}).</p>
+                                                <p class="text-xs font-medium text-content-muted">{course.code}</p>
+                                            </div>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    togglePin(course);
+                                                }}
+                                                class="p-1 rounded-lg text-danger opacity-0 group-hover:opacity-100 hover:bg-danger/10 transition-opacity shrink-0"
+                                                title="Unpin"
+                                            >
+                                                <Pin width={14} class="fill-current" />
+                                            </button>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <div class="flex-1 h-1.5 rounded-full overflow-hidden bg-edge">
+                                                <div class="h-full rounded-full bg-primary" style={{ width: `${course.progress}%` }} />
+                                            </div>
+                                            <span class="text-xs font-medium text-content-muted">{course.progress}%</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Upcoming Tasks */}
+                    <div class="rounded-xl border-2 border-edge bg-page">
+                        <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
+                                    <CheckCircle class="w-4 h-4 text-on-primary" />
+                                </div>
+                                <h3 class="font-semibold text-sm text-content">Tasks Due</h3>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">View all</span>
+                        </div>
+                        <div class="divide-y-2 divide-edge">
+                            {deadlines.slice(0, 4).map((task) => (
+                                <div 
+                                    key={task.id} 
+                                    class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-page-secondary"
+                                    onClick={() => window.open(task.url, "_blank")}
+                                >
+                                    {(() => {
+                                        const now = Date.now();
+                                        const due = task.dueTimestamp * 1000;
+                                        const isUrgent = due <= now + 24 * 60 * 60 * 1000; // Within 24 hours
+                                        return (
+                                            <>
+                                                <div class={`w-10 h-10 rounded-xl flex items-center justify-center ${isUrgent ? 'bg-danger' : 'bg-primary/10'}`}>
+                                                    {isUrgent ? <AlertCircle class="w-5 h-5 text-on-primary" /> : <FileText class="w-5 h-5 text-primary" />}
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <p class="font-semibold text-sm text-content truncate">{task.title}</p>
+                                                    <p class="text-xs font-medium text-content-muted">{task.courseCode}</p>
+                                                </div>
+                                                <div class="flex flex-col items-end gap-1">
+                                                    <span class={`text-xs px-2 py-1 rounded-lg font-semibold ${isUrgent ? 'bg-danger text-on-primary' : 'bg-primary/10 text-primary'}`}>
+                                                        {formatDueDate(task.dueTimestamp * 1000)}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            ))}
+                            {deadlines.length === 0 && (
+                                <div class="px-4 py-6 text-center text-content-muted text-sm">
+                                    No upcoming tasks
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Recent Courses */}
+                    <div>
+                        <h3 class="font-semibold text-sm text-content mb-3">Recent Courses</h3>
+                        <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                            {courses.filter(c => !isPinned(c.id)).slice(0, 5).map((course) => (
+                                <div
+                                    key={course.id}
+                                    class="group relative flex-shrink-0 w-56 rounded-xl border-2 border-edge p-3 cursor-pointer bg-page hover:border-primary transition-colors"
+                                    onClick={() => navigateTab(CourseDetailTab(String(course.id), course.title))}
+                                >
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-primary shrink-0">
+                                            <BookOpen class="w-5 h-5 text-on-primary" />
+                                        </div>
+                                        <div class="flex-1 min-w-0 overflow-hidden">
+                                            <p class="font-semibold text-sm text-content truncate" title={course.title}>{course.title}</p>
+                                            <p class="text-xs font-medium text-content-muted mt-1">{course.code}</p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                togglePin(course);
+                                            }}
+                                            class="p-1 rounded-lg text-danger opacity-0 group-hover:opacity-100 hover:bg-danger/10 transition-opacity shrink-0"
+                                            title="Pin course"
+                                        >
+                                            <Pin width={14} class="fill-current" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column - Narrow */}
+                <div class="space-y-4">
+                    {/* Forums */}
+                    <div class="rounded-xl border-2 border-edge bg-page">
+                        <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
+                                    <MessageSquare class="w-4 h-4 text-on-primary" />
+                                </div>
+                                <h3 class="font-semibold text-sm text-content">Forums</h3>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-1 rounded-lg bg-danger text-on-primary">
+                                {notifications.filter(n => n.module?.toLowerCase().includes('forum')).length} new
+                            </span>
+                        </div>
+                        <div class="divide-y-2 divide-edge">
+                            {notifications.filter(n => n.module?.toLowerCase().includes('forum')).slice(0, 3).map((forum) => (
+                                <div 
+                                    key={forum.id}
+                                    class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-page-secondary"
+                                    onClick={() => window.open(forum.url, "_blank")}
+                                >
+                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-page-secondary">
+                                        <span class="text-sm font-bold text-content-muted">N</span>
+                                    </div>
                                     <div class="flex-1 min-w-0">
-                                        <div class={`text-sm truncate ${notif.isRead ? "text-content-muted" : "text-content font-medium"}`}>
-                                            {notif.title}
+                                        <p class="font-semibold text-sm text-content truncate">{forum.title}</p>
+                                        <p class="text-xs font-medium text-content-muted">{forum.module}</p>
+                                    </div>
+                                    {!forum.isRead && <span class="w-2 h-2 rounded-full bg-primary" />}
+                                </div>
+                            ))}
+                            {notifications.filter(n => n.module?.toLowerCase().includes('forum')).length === 0 && (
+                                <div class="px-4 py-6 text-center text-content-muted text-sm">
+                                    No new forums
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    
+                    {/* Notifications */}
+                    <div class="rounded-xl border-2 border-edge bg-page">
+                        <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
+                                    <Bell class="w-4 h-4 text-on-primary" />
+                                </div>
+                                <h3 class="font-semibold text-sm text-content">Notifications</h3>
+                            </div>
+                            {unreadNotifs > 0 && (
+                                <span class="text-xs font-semibold px-2 py-1 rounded-lg bg-danger text-on-primary">
+                                    {unreadNotifs} new
+                                </span>
+                            )}
+                        </div>
+                        <div class="divide-y-2 divide-edge">
+                            {notifications.slice(0, 5).map((notif) => (
+                                <div 
+                                    key={notif.id}
+                                    class="p-3 cursor-pointer hover:bg-page-secondary"
+                                    onClick={() => window.open(notif.url, "_blank")}
+                                >
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10">
+                                            <Bell class="w-5 h-5 text-primary" />
                                         </div>
-                                        <div class="text-xs text-content-muted mt-0.5">
-                                            {notif.module}
+                                        <div class="flex-1 min-w-0">
+                                            <p class={`font-semibold text-sm ${notif.isRead ? 'text-content-muted' : 'text-content'}`}>
+                                                {notif.title}
+                                            </p>
+                                            <p class="text-xs font-medium text-content-muted mt-1">{notif.module}</p>
                                         </div>
+                                        {!notif.isRead && <span class="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                            {notifications.length === 0 && (
+                                <div class="px-4 py-6 text-center text-content-muted text-sm">
+                                    No notifications
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
 
-            {/* Courses Section */}
-            <div>
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-bold text-content">My Courses</h2>
-                    <button
-                        onClick={handleRefresh}
-                        disabled={isRefreshing}
-                        class="p-2 rounded-lg border border-edge hover:border-accent transition-colors disabled:opacity-50"
-                        title="Refresh"
-                    >
-                        <svg
-                            class={`w-5 h-5 text-content-muted ${isRefreshing ? 'animate-spin' : ''}`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                    </button>
+                    
                 </div>
-
-                {isLoading ? (
-                    <div class="flex flex-col gap-4">
-                        <div class="h-24 bg-panel animate-pulse rounded-xl border border-edge" />
-                        <div class="h-24 bg-panel animate-pulse rounded-xl border border-edge" />
-                    </div>
-                ) : error ? (
-                    <div class="p-4 bg-danger/10 text-danger rounded-lg border border-danger/20">
-                        {error}
-                    </div>
-                ) : (
-                    <div class="grid grid-cols-1 gap-4">
-                        {courses.map((course) => (
-                            <div
-                                key={course.id}
-                                onClick={() => navigateTab(CourseDetailTab(String(course.id), course.title))}
-                                class="group p-4 bg-panel border border-edge rounded-xl hover:border-accent transition-all cursor-pointer"
-                            >
-                                <div class="text-xs font-bold text-accent uppercase mb-1">
-                                    {course.code}
-                                </div>
-                                <div class="text-base font-semibold text-content group-hover:text-accent transition-colors">
-                                    {course.title}
-                                </div>
-                                
-                                <div class="mt-4 flex items-center gap-3">
-                                    <div class="flex-1 h-1.5 bg-page rounded-full overflow-hidden">
-                                        <div 
-                                            class="h-full bg-accent transition-all" 
-                                            style={{ width: `${course.progress}%` }} 
-                                        />
-                                    </div>
-                                    <span class="text-[10px] font-bold text-content-muted">
-                                        {Math.round(course.progress)}%
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                        
-                        {courses.length === 0 && (
-                            <p class="text-center text-content-muted py-10">
-                                You have no in-progress courses. 
-                            </p>
-                        )}
-                    </div>
-                )}
             </div>
         </div>
     );

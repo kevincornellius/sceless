@@ -4,8 +4,10 @@ import { loadNotifications } from "@/src/stores/indexeddb/notification";
 import { useEffect, useState, useRef } from "preact/hooks";
 import type { Profile as ProfileType } from "@/src/types/profile";
 import type { AppNotification } from "@/src/types/scele";
-import { LogOut, Clock, Bell, Search, ChevronDown, X } from "lucide-preact";
+import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette } from "lucide-preact";
 import { logout } from "@/src/stores/auth";
+import { theme, changeTheme } from "@/src/stores/theme";
+import { defaultThemes, type ThemeConfig } from "@/src/types/themes";
 
 interface UserProfileProps {
     profile: ProfileType | null;
@@ -99,6 +101,75 @@ function Notifications() {
     );
 }
 
+function ThemeSelector() {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
+    }, []);
+
+    const currentTheme = defaultThemes.find(t => t.name === theme.value.name) || defaultThemes[0];
+
+    const handleThemeChange = async (t: ThemeConfig) => {
+        await changeTheme(t);
+        setIsOpen(false);
+    };
+
+    return (
+        <div 
+            class="relative" 
+            ref={dropdownRef}
+        >
+            <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(!isOpen);
+                }}
+                class="p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-page-hover hover:text-content transition-all"
+                title="Change theme"
+            >
+                <Palette className="w-4 h-4" />
+            </button>
+
+            {isOpen && (
+                <div class="absolute right-0 top-full mt-2 w-56 bg-page border border-edge rounded-lg shadow-lg overflow-hidden z-50">
+                    <div class="p-3 border-b border-edge">
+                        <span class="font-semibold text-content text-sm">Choose Theme</span>
+                    </div>
+                    
+                    <div class="py-1">
+                        {defaultThemes.map((t) => (
+                            <button
+                                key={t.name}
+                                onClick={() => handleThemeChange(t)}
+                                class={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-page-secondary transition-colors ${
+                                    t.name === currentTheme.name ? 'bg-page-secondary' : ''
+                                }`}
+                            >
+                                <div 
+                                    class="w-5 h-5 rounded-full border-2 border-edge"
+                                    style={{ backgroundColor: t.primary }}
+                                />
+                                <span class="flex-1 text-left text-content">{t.name}</span>
+                                {t.name === currentTheme.name && (
+                                    <span class="text-xs text-primary font-medium">Active</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 interface UserProfileProps {
     profile: ProfileType | null;
 }
@@ -138,7 +209,7 @@ function UserProfile({ profile }: UserProfileProps) {
                     e.stopPropagation();
                     setIsOpen(!isOpen);
                 }}
-                class="flex items-center gap-2 pl-2 border-l border-edge hover:bg-black/5 rounded-lg transition-colors py-1"
+                class="flex items-center gap-2 pl-2 border-l-2 border-edge  hover:bg-black/5 transition-colors py-1"
             >
                 {profile?.pictureurl ? (
                     <img
@@ -209,7 +280,7 @@ const Navbar = () => {
     }, []);
 
     return (
-        <header class="h-14 shrink-0 flex items-center justify-between w-full pr-8 pl-4">
+        <header class="h-14 shrink-0 flex items-center justify-between w-full pr-8">
 
 			<div className="relative hidden sm:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
@@ -227,6 +298,8 @@ const Navbar = () => {
 				</div>
 
 				  <Notifications />
+
+                  <ThemeSelector />
 
                 <UserProfile profile={profile} />
 			</div>

@@ -28,11 +28,12 @@ export interface CalendarEventsResponse {
 
 export async function getUpcomingDeadlines(): Promise<Deadline[]> {
     const data = await fetchMoodle<CalendarEventsResponse>(
-        "core_calendar_get_action_events_by_timesort",
-        {
-            limitnum: 15,          
-            timesortfrom: Math.floor(Date.now() / 1000) 
-        }
+        // "core_calendar_get_action_events_by_timesort",
+        "core_calendar_get_calendar_upcoming_view",
+        // {
+        //     limitnum: 15,          
+        //     timesortfrom: Math.floor(Date.now() / 1000) 
+        // }
     );
 
     if (!data || !data.events) {
