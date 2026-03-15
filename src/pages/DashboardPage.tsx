@@ -246,7 +246,7 @@ export default function DashboardPage() {
                     <div>
                         <h3 class="font-semibold text-sm text-content mb-3">Recent Courses</h3>
                         <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-                            {courses.filter(c => !isPinned(c.id)).slice(0, 5).map((course) => (
+                            {courses.filter(c => !isPinned(c.id)).map((course) => (
                                 <div
                                     key={course.id}
                                     class="group relative flex-shrink-0 w-56 rounded-xl border-2 border-edge p-3 cursor-pointer bg-page hover:border-primary transition-colors"

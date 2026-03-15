@@ -20,7 +20,9 @@ export const add = async (tab: Tab) => {
 
 	if (!exists) {
 		console.log(`Adding new tab: ${tabKey}`);
-		await tabsStorage.setValue([...openTabs.value, tab]);
+		const newTabsList = [...openTabs.value, tab];
+		openTabs.value = newTabsList;
+		await tabsStorage.setValue(newTabsList);
 	}
 };
 
