@@ -14,12 +14,13 @@ export const closeAllDropdowns = () => {
 };
 import type { Profile as ProfileType } from "@/src/types/profile";
 import type { AppNotification } from "@/src/types/scele";
-import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen } from "lucide-preact";
+import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon } from "lucide-preact";
 import { logout } from "@/src/stores/auth";
 import { theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes, type ThemeConfig } from "@/src/types/themes";
 import { CourseDetailTab } from "@/src/pages/CourseDetailPage";
 import { navigateTab } from "@/src/routing/router";
+import { db } from "@/src/stores/indexeddb/db";
 
 interface UserProfileProps {
     profile: ProfileType | null;
@@ -192,6 +193,12 @@ function UserProfile({ profile }: UserProfileProps) {
     const handleLogout = async () => {
         await logout();
     };
+    const handleClearData = async () => {
+        
+        await db.clearFullDatabase();
+        await browser.storage.local.clear();
+        window.location.reload();
+    }
 
     return (
         <div 
@@ -245,6 +252,13 @@ function UserProfile({ profile }: UserProfileProps) {
                         >
                             <LogOut width={16} />
                             Logout
+                        </button>
+                        <button
+                            onClick={handleClearData}
+                            class="w-full flex items-center cursor-pointer gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"
+                        >
+                            <Trash2Icon width={16} />
+                            Clear Data
                         </button>
                     </div>
                 </div>

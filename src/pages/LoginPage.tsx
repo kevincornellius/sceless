@@ -18,6 +18,7 @@ export function LoginPage() {
         try {
             console.log("Submitting:", { username});
 			const token = await authenticateMoodleWS(username, password);
+            console.log("Received token:", token);
             await saveToken(token);
             
             

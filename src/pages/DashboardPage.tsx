@@ -43,6 +43,7 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const init = async () => {
+            console.log("Loading dashboard data...");
             try {
                 const [coursesResult, deadlinesResult, notificationsResult] = await Promise.all([
                     loadCourses(),

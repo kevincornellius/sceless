@@ -1,4 +1,3 @@
-
 const DB_NAME = "sceless-cache";
 const DB_VERSION = 1;
 
@@ -11,7 +10,6 @@ interface DBSchema {
 }
 
 type StoreName = keyof DBSchema;
-
 class DB {
   private db: IDBDatabase | null = null;
   private initPromise: Promise<IDBDatabase> | null = null;
@@ -23,9 +21,18 @@ class DB {
     this.initPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        this.initPromise = null;
+        reject(request.error);
+      };
+
       request.onsuccess = () => {
         this.db = request.result;
+        this.db.onversionchange = () => {
+          this.db?.close();
+          this.db = null;
+          this.initPromise = null;
+        };
         resolve(this.db);
       };
 
@@ -40,56 +47,77 @@ class DB {
     return this.initPromise;
   }
 
-  async get<T>(storeName: StoreName, key: string): Promise<T | null> {
+  private async getStore(storeName: StoreName, mode: IDBTransactionMode) {
     const db = await this.open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, "readonly");
-      const store = tx.objectStore(storeName);
-      const request = store.get(key);
+    const tx = db.transaction(storeName, mode);
+    return tx.objectStore(storeName);
+  }
 
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const result = request.result as { key: string; data: T; timestamp: number } | undefined;
-        resolve(result?.data ?? null);
-      };
-    });
+  async get<T>(storeName: StoreName, key: string): Promise<T | null> {
+    try {
+      const store = await this.getStore(storeName, "readonly");
+      return new Promise((resolve, reject) => {
+        const request = store.get(key);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const result = request.result as { data: T } | undefined;
+          resolve(result?.data ?? null);
+        };
+      });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Restored: getTimestamp
+  async getTimestamp(storeName: StoreName, key: string): Promise<number | null> {
+    try {
+      const store = await this.getStore(storeName, "readonly");
+      return new Promise((resolve, reject) => {
+        const request = store.get(key);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const result = request.result as { timestamp: number } | undefined;
+          resolve(result?.timestamp ?? null);
+        };
+      });
+    } catch (e) {
+      return null;
+    }
   }
 
   async set<T>(storeName: StoreName, key: string, data: T): Promise<void> {
-    const db = await this.open();
+    const store = await this.getStore(storeName, "readwrite");
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, "readwrite");
-      const store = tx.objectStore(storeName);
       const request = store.put({ key, data, timestamp: Date.now() });
-
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
     });
   }
 
   async delete(storeName: StoreName, key: string): Promise<void> {
-    const db = await this.open();
+    const store = await this.getStore(storeName, "readwrite");
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, "readwrite");
-      const store = tx.objectStore(storeName);
       const request = store.delete(key);
-
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve();
     });
   }
 
-  async getTimestamp(storeName: StoreName, key: string): Promise<number | null> {
-    const db = await this.open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(storeName, "readonly");
-      const store = tx.objectStore(storeName);
-      const request = store.get(key);
+  async clearFullDatabase(): Promise<void> {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+    this.initPromise = null;
 
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const result = request.result as { key: string; data: unknown; timestamp: number } | undefined;
-        resolve(result?.timestamp ?? null);
+      request.onblocked = () => {
+        console.warn("Delete blocked by other tabs");
+        resolve(); 
       };
     });
   }

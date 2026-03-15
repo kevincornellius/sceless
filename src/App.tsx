@@ -10,6 +10,7 @@ import { LoginPage } from "./pages/LoginPage";
 import type { ComponentChildren } from "preact";
 import { UrlToTab } from "./helper/tabs";
 import { loadCourses } from "./stores/indexeddb/course";
+import { loadSiteInfo } from "./stores/indexeddb/siteinfo";
 
 const getPageFromActiveTabKey = (): ComponentChildren => {
 	const key = activeTabKey.value;
@@ -30,35 +31,63 @@ const getPageFromActiveTabKey = (): ComponentChildren => {
 const PageContent = () => {
 	return getPageFromActiveTabKey();
 };
+type AppState = 'checking_auth' | 'unauthenticated' | 'booting_data' | 'ready';
 
 const App = () => {
-    const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+    const [appState, setAppState] = useState<AppState>('checking_auth');
 
     useEffect(() => {
-        const prepareApp = async () => {
+        const initializeAuth = async () => {
             try {
-                await initAuthStore();
+                await initAuthStore(); 
                 await initStore();
-				await initializeTheme();
-				await loadCourses();
+                await initializeTheme();
                 initNavigation();
-                await navigateTab(UrlToTab(window.location.href) || DashboardTab);
-
+                
+                if (wsToken.value) {
+                    setAppState('booting_data');
+                } else {
+                    setAppState('unauthenticated');
+                }
             } catch (e) {
-                console.error("Initialization failed", e);
-            } finally {
-                setIsCheckingAuth(false);
+                console.error("Auth init failed", e);
+                setAppState('unauthenticated');
             }
         };
-
-        prepareApp();
+        initializeAuth();
     }, []);
 
-    if (isCheckingAuth) {
+    useEffect(() => {
+        if (appState === 'unauthenticated' && wsToken.value) {
+            setAppState('booting_data');
+        }
+    }, [wsToken.value, appState]);
+
+    useEffect(() => {
+        if (appState === 'booting_data') {
+            const bootCoreData = async () => {
+                try {
+                    console.log("Bootstrapping core application data...");
+                    await loadSiteInfo(); 
+                    await loadCourses();
+                    await navigateTab(UrlToTab(window.location.href) || DashboardTab);
+                } catch (e) {
+                    console.error("Failed to boot core data", e);
+                } finally {
+                    setAppState('ready'); // ONLY NOW do we let the UI render
+                }
+            };
+            bootCoreData();
+        }
+    }, [appState]);
+
+
+    if (appState === 'checking_auth' || appState === 'booting_data') {
+        // Keeps the UI locked while background data is fetching
         return <div class="bg-page min-h-screen" />; 
     }
 
-    if (!wsToken.value) {
+    if (appState === 'unauthenticated') {
         return <LoginPage />;
     }
 
@@ -68,6 +97,5 @@ const App = () => {
         </Layout>
     );
 };
-
 
 export default App;

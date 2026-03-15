@@ -1,11 +1,11 @@
 import { SCELE_URL } from "@/src/config";
-import { logout, wsToken } from "@/src/stores/auth";
+import { logout, tokenStorage, wsToken } from "@/src/stores/auth";
 
 export async function fetchMoodle<T = any>(
     wsFunction: string, 
     params: Record<string, string | number | boolean> = {}
 ): Promise<T | undefined> {
-    const token = wsToken.value;
+    let token = wsToken.value;
 
     if (!token) {
         console.warn("Attempted API call without token.");

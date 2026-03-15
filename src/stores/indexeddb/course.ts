@@ -41,13 +41,16 @@ let firstLoad = false;
 
 export async function loadCourses(): Promise<{ courses: Course[]; isFromCache: boolean }> {
   
+  console.log("Loading courses...");
     if(!firstLoad)
     {
         firstLoad = true;
         const courseList = await refreshCourses();
         coursesLoaded.value = true;
+        console.log("Returning: ", courseList);
         return { courses: courseList, isFromCache: false };
     }
+
 
     const cacheValid = await isCacheValid();
     const cached = await getCachedCourses();

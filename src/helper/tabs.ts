@@ -44,7 +44,7 @@ export function UrlToTab(urlString: string): Tab | null {
 
 		return DashboardTab;
 	} catch (error) {
-		console.warn("Failed to parse URL:", urlString);
+		console.warn("Failed to parse URL:", urlString, error);
 		return null;
 	}
 }
