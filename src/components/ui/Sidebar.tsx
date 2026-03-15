@@ -5,7 +5,9 @@ import {
 	getTabKey,
 	openTabs,
 	openTabsLoaded,
+	removeAll,
 } from "@/src/stores/tabs";
+import { pinnedCourses, pinnedCoursesLoaded } from "@/src/stores/pinned";
 import { useEffect, useState } from "preact/hooks";
 import { Logo, LogoL } from "./Logo";
 import {
@@ -27,7 +29,6 @@ const Sidebar = () => {
 	const [width, setWidth] = useState(DEFAULT_W);
 	const [animate, setAnimate] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
-
 	const expanded = width > MIN_W;
 
 	const handleMouseDown = (e: MouseEvent) => {
@@ -183,31 +184,90 @@ const Sidebar = () => {
 		return (
 			<div class="flex flex-col">
 				{expanded && (
-					<h1 class="text-xs font-semibold text-content-muted px-3 py-2">
+					<button
+						type="button"
+						class="text-xs font-semibold text-content-muted px-3 py-2 text-left hover:text-content transition-colors cursor-pointer"
+					>
 						OVERVIEW
-					</h1>
+					</button>
 				)}
 				<div class="flex flex-col gap-0.5 px-2">
 					{ACTION_TABS.map((tab) => (
 						<TabBar tab={tab} icon={LayoutDashboardIcon} closable={false} />
 					))}
 				</div>
+				<span class="border-t border-edge mx-2 my-2" />
+			</div>
+		);
+	};
+
+	const PinnedTabs = () => {
+		console.log("Rendering PinnedTabs. Loaded:", pinnedCoursesLoaded.value, "Courses:", pinnedCourses.value);
+		if (!pinnedCoursesLoaded.value || pinnedCourses.value.length === 0) return null;
+
+		const pinnedTabs = pinnedCourses.value.map((course) => ({
+			type: "course",
+			id: String(course.id),
+			title: course.code || course.title,
+			url: TabToUrl({ type: "course", id: String(course.id), title: "", url: "" }),
+		}));
+
+
+		return (
+			<div class="flex flex-col">
+				{expanded && (
+					<button
+						type="button"
+						class="text-xs font-semibold text-content-muted px-3 py-2 text-left hover:text-content transition-colors cursor-pointer"
+					>
+						PINNED COURSES
+					</button>
+				)}
+				<div class="flex flex-col gap-0.5 px-2">
+					{pinnedTabs.map((tab) => (
+						<TabBar tab={tab} icon={BookOpen} closable={false} />
+					))}
+				</div>
+				<span class="border-t border-edge mx-2 my-2" />
 			</div>
 		);
 	};
 
 	const OpenTabs = () => {
-		if (!openTabsLoaded.value) return null;
+        if (!openTabsLoaded.value || !pinnedCoursesLoaded.value) return null;
+		
+        const pinnedTabKeys = new Set(
+            pinnedCourses.value.map((course) => {
+                const dummyTab: Tab = { type: "course", id: String(course.id), title: "", url: "" };
+                return getTabKey(dummyTab);
+            })
+        );
 
-		const shownTabs = openTabs.value.filter(
-			(tab) =>
-				!ACTION_TABS.some((t) => getTabKey(t) === getTabKey(tab)) &&
-				tab.type !== "pinned",
-		);
-		if (shownTabs.length === 0) return null;
+        const actionTabKeys = new Set(ACTION_TABS.map((t) => getTabKey(t)));
 
+        const shownTabs = openTabs.value.filter((tab) => {
+            const currentTabKey = getTabKey(tab);
+            return !actionTabKeys.has(currentTabKey) && !pinnedTabKeys.has(currentTabKey);
+        });
+
+        if (shownTabs.length === 0) return null;
 		return (
 			<div class="flex flex-col">
+				{expanded && (
+					<div class="flex items-center justify-between px-3 py-2">
+						<span class="text-xs font-semibold text-content-muted">
+							OPENED
+						</span>
+						<button
+							type="button"
+							onClick={() => removeAll()}
+							class="text-xs text-content-muted hover:text-danger transition-colors cursor-pointer"
+							title="Close all tabs"
+						>
+							Close all
+						</button>
+					</div>
+				)}
 				<div class="flex flex-col gap-0.5 px-2">
 					{shownTabs.map((tab) => (
 						<TabBar
@@ -222,6 +282,8 @@ const Sidebar = () => {
 		);
 	};
 
+	console.log("Rendering Sidebar with tabs:", openTabs.value);
+
 	return (
 		<aside
 			style={{ width: `${width}px` }}
@@ -229,7 +291,7 @@ const Sidebar = () => {
 		>
 			<Top />
 			<Actions />
-			<span class="border-t border-edge mx-2 my-2" />
+			<PinnedTabs />
 			<OpenTabs />
 			<div
 				onMouseDown={handleMouseDown}

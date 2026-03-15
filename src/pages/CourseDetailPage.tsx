@@ -6,6 +6,7 @@ import { loadCourseContents } from "../stores/indexeddb/courseContents";
 import { activeTabKey, getTabKey, openTabs } from "../stores/tabs";
 import { ViewModeSelector, ChronologicalView, GroupedView } from "../components/course/CourseContentView";
 import { Search } from "lucide-preact";
+import { getCourseTitle } from "../stores/indexeddb/course";
 
 const CourseDetailPage = ({ courseId }: { courseId: string }) => {
     const [contents, setContents] = useState<CourseSection[]>([]);
@@ -14,11 +15,7 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
     const [searchQuery, setSearchQuery] = useState("");
 
     // Get course title from tabs store
-    const courseTitle = (() => {
-        const tab = openTabs.value.find(t => getTabKey(t) === activeTabKey.value);
-        return tab?.title || `Course ${courseId}`;
-    })();
-
+    const courseTitle = getCourseTitle(courseId) || openTabs.value.find(tab => getTabKey(tab) === `course:${courseId}`)?.title || `Course ${courseId}`;
     // Filter sections/modules based on search query
     const filteredContents = useMemo(() => {
         if (!searchQuery.trim()) return contents;
@@ -115,11 +112,11 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
 
 export default CourseDetailPage;
 
-export const CourseDetailTab = (courseId: string, courseTitle: string, courseUrl? :string|undefined): Tab => {
+export const CourseDetailTab = (courseId: string, courseCode: string, courseUrl? :string|undefined): Tab => {
 	return {
 		type: "course",
 		id: courseId,
-		title: courseTitle,
+		title: courseCode,
 		url: courseUrl || `${SCELE_URL}/course/view.php?id=${courseId}`,
 	} as Tab;
 };

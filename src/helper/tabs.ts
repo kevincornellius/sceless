@@ -2,7 +2,7 @@ import { SCELE_URL } from "../config";
 import { CourseDetailTab } from "../pages/CourseDetailPage";
 import { DashboardTab } from "../pages/DashboardPage";
 import { Tab } from "../types/state";
-import { getCourseTitle } from "../stores/indexeddb/course";
+import { getCourseCode, getCourseTitle } from "../stores/indexeddb/course";
 
 export function TabToUrl(tab: Tab): string {
 	const route = () => {
@@ -28,7 +28,7 @@ export function UrlToTab(urlString: string): Tab | null {
 
 		if (path === "/course/view.php") {
 			if (!id) return DashboardTab;
-			const courseTitle = getCourseTitle(id) || `Course ${id}`;
+			const courseTitle = getCourseCode(id) || `Course ${id}`;
 			return CourseDetailTab(id, courseTitle);
 		}
 

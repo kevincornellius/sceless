@@ -10,7 +10,7 @@ import { loadNotifications } from "../stores/indexeddb/notification";
 import { Deadline } from "../types/scele";
 import { AppNotification } from "../types/scele";
 import { Clock, Bell, AlertCircle, Pin, BookOpen, CheckCircle, MessageSquare, Calendar, Star, ChevronRight, FileText } from "lucide-preact";
-import { pinnedCourses, togglePin, initPinnedCoursesStore, isPinned } from "../stores/pinned";
+import { pinnedCourses, togglePin, isPinned } from "../stores/pinned";
 
 export default function DashboardPage() {
     const [courses, setCourses] = useState<Course[]>([]);
@@ -36,10 +36,6 @@ export default function DashboardPage() {
     }).length;
 
     const unreadNotifs = notifications.filter(n => !n.isRead).length;
-
-    useEffect(() => {
-        initPinnedCoursesStore();
-    }, []);
 
     useEffect(() => {
         const init = async () => {
@@ -114,12 +110,10 @@ export default function DashboardPage() {
         const date = new Date(timestamp);
         const now = new Date();
         const diffMs = date.getTime() - now.getTime();
-        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        const diffHours = Math.ceil(diffMs / (1000 * 60 * 60));
 
-        if (diffDays < 0) return "Overdue";
-        if (diffDays === 0) return "Today";
-        if (diffDays === 1) return "Tomorrow";
-        if (diffDays <= 7) return `In ${diffDays} days`;
+        if (diffHours < 0) return "Overdue";
+        if (diffHours <= 48) return `In ${diffHours} hours`;
         return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     };
 
@@ -165,15 +159,15 @@ export default function DashboardPage() {
                                 {pinnedCourses.value.map((course) => (
                                     <div
                                         key={course.id}
-                                        class="group relative flex-shrink-0 w-64 rounded-xl border-2 border-edge p-4 cursor-pointer bg-page hover:border-primary transition-colors"
-                                        onClick={() => navigateTab(CourseDetailTab(String(course.id), course.title))}
+                                        class="group relative shrink-0 w-64 rounded-xl border-2 border-edge p-4 cursor-pointer bg-page hover:border-primary transition-colors"
+                                        onClick={() => navigateTab(CourseDetailTab(String(course.id), course.code))}
                                     >
                                         <div class="flex items-start gap-3 mb-3">
                                             <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-primary shrink-0">
                                                 <BookOpen class="w-5 h-5 text-on-primary" />
                                             </div>
                                             <div class="flex-1 min-w-0 overflow-hidden">
-                                                <p class="font-semibold text-sm text-content truncate" title={course.title}>({course.title}).</p>
+                                                <p class="font-semibold text-sm text-content truncate" title={course.title}>{course.title}</p>
                                                 <p class="text-xs font-medium text-content-muted">{course.code}</p>
                                             </div>
                                             <button
@@ -220,7 +214,7 @@ export default function DashboardPage() {
                                     {(() => {
                                         const now = Date.now();
                                         const due = task.dueTimestamp * 1000;
-                                        const isUrgent = due <= now + 24 * 60 * 60 * 1000; // Within 24 hours
+                                        const isUrgent = due <= now + 48 * 60 * 60 * 1000; // Within 48 hours
                                         return (
                                             <>
                                                 <div class={`w-10 h-10 rounded-xl flex items-center justify-center ${isUrgent ? 'bg-danger' : 'bg-primary/10'}`}>
@@ -256,7 +250,7 @@ export default function DashboardPage() {
                                 <div
                                     key={course.id}
                                     class="group relative flex-shrink-0 w-56 rounded-xl border-2 border-edge p-3 cursor-pointer bg-page hover:border-primary transition-colors"
-                                    onClick={() => navigateTab(CourseDetailTab(String(course.id), course.title))}
+                                    onClick={() => navigateTab(CourseDetailTab(String(course.id), course.code))}
                                 >
                                     <div class="flex items-start gap-3">
                                         <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-primary shrink-0">

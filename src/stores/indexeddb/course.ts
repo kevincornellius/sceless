@@ -75,3 +75,7 @@ export function getCourseTitle(courseId: string): string | null {
     const course = courses.value.find(c => c.id.toString() === courseId);
     return course?.title ?? null;
 }
+export function getCourseCode(courseId: string): string | null {
+    const course = courses.value.find(c => c.id.toString() === courseId);
+    return course?.code ?? null;
+}

@@ -43,6 +43,12 @@ export const remove = async (tabKey: string) => {
 	
 };
 
+export const removeAll = async () => {
+	await tabsStorage.setValue([]);
+	activeTabKey.value = FALLBACK_TAB_KEY;
+	document.title = DashboardTab.title;
+};
+
 export async function initStore() {
 	const initialTabs = await tabsStorage.getValue();
 

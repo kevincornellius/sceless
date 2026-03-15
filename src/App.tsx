@@ -11,6 +11,7 @@ import type { ComponentChildren } from "preact";
 import { UrlToTab } from "./helper/tabs";
 import { loadCourses } from "./stores/indexeddb/course";
 import { loadSiteInfo } from "./stores/indexeddb/siteinfo";
+import { initPinnedCoursesStore } from "./stores/pinned";
 
 const getPageFromActiveTabKey = (): ComponentChildren => {
 	const key = activeTabKey.value;
@@ -70,6 +71,8 @@ const App = () => {
                     console.log("Bootstrapping core application data...");
                     await loadSiteInfo(); 
                     await loadCourses();
+                    await initPinnedCoursesStore();
+
                     await navigateTab(UrlToTab(window.location.href) || DashboardTab);
                 } catch (e) {
                     console.error("Failed to boot core data", e);
