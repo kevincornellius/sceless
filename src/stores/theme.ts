@@ -22,6 +22,14 @@ const applyTheme = (t: ThemeConfig) => {
 	root.style.setProperty("--theme-highlight", t.highlight);
 	root.style.setProperty("--theme-success", t.success);
 	root.style.setProperty("--theme-danger", t.danger);
+
+	// Add dark theme class for noise texture on dark backgrounds
+	const isDark = t.bg.startsWith("#") && parseInt(t.bg.slice(1), 16) < 0x888888;
+	if (isDark) {
+		root.classList.add("theme-dark");
+	} else {
+		root.classList.remove("theme-dark");
+	}
 };
 
 export const initializeTheme = async () => {

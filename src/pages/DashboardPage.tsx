@@ -121,22 +121,37 @@ export default function DashboardPage() {
         <div class="p-4 lg:p-6 h-full overflow-y-auto">
             {/* Stats Strip */}
             <div class="flex gap-2 mb-4 overflow-x-auto scrollbar-thin">
-                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 bg-primary text-on-primary border-primary">
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold">{dueToday}</span>
-                        <span class="text-xs font-semibold opacity-80">Due Today</span>
+                <div class={`flex-shrink-0 px-4 py-3 rounded-xl border-2 bg-page animate-fade-slide-up ${dueToday > 0 ? 'border-danger' : 'border-edge'}`}>
+                    <div class="flex items-center gap-2">
+                        <div class={`w-8 h-8 rounded-lg flex items-center justify-center ${dueToday > 0 ? 'bg-danger' : 'bg-edge'}`}>
+                            {dueToday > 0 ? <AlertCircle class="w-4 h-4 text-on-primary" /> : <Clock class="w-4 h-4 text-content-muted" />}
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class={`text-2xl font-bold ${dueToday > 0 ? 'text-danger' : 'text-content'}`}>{dueToday}</span>
+                            <span class={`text-xs font-semibold ${dueToday > 0 ? 'text-danger' : 'text-content-muted'}`}>Due Today</span>
+                        </div>
                     </div>
                 </div>
-                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 bg-page border-edge">
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-content">{dueThisWeek}</span>
-                        <span class="text-xs font-semibold text-content-muted">Due This Week</span>
+                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 border-edge bg-page animate-fade-slide-up delay-1">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-edge">
+                            <Calendar class="w-4 h-4 text-content-muted" />
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-2xl font-bold text-content">{dueThisWeek}</span>
+                            <span class="text-xs font-semibold text-content-muted">This Week</span>
+                        </div>
                     </div>
                 </div>
-                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 bg-page border-edge">
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-content">{unreadNotifs}</span>
-                        <span class="text-xs font-semibold text-content-muted">Unread</span>
+                <div class="flex-shrink-0 px-4 py-3 rounded-xl border-2 border-edge bg-page animate-fade-slide-up delay-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-edge">
+                            <Bell class="w-4 h-4 text-content-muted" />
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-2xl font-bold text-content">{unreadNotifs}</span>
+                            <span class="text-xs font-semibold text-content-muted">Unread</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -147,7 +162,7 @@ export default function DashboardPage() {
                 <div class="lg:col-span-2 space-y-4">
                     {/* Pinned Courses */}
                     {pinnedCourses.value.length > 0 && (
-                        <div>
+                        <div class="animate-fade-slide-up delay-3">
                             <div class="flex items-center gap-2 mb-3">
                                 <Star class="w-4 h-4 text-highlight fill-current" />
                                 <h3 class="font-semibold text-sm text-content">Pinned Courses</h3>
@@ -194,7 +209,7 @@ export default function DashboardPage() {
                     )}
 
                     {/* Upcoming Tasks */}
-                    <div class="rounded-xl border-2 border-edge bg-page">
+                    <div class="rounded-xl border-2 border-edge bg-page animate-fade-slide-up delay-4">
                         <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
                             <div class="flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
@@ -243,7 +258,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Recent Courses */}
-                    <div>
+                    <div class="animate-fade-slide-up delay-5">
                         <h3 class="font-semibold text-sm text-content mb-3">Recent Courses</h3>
                         <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
                             {courses.filter(c => !isPinned(c.id)).map((course) => (
@@ -280,7 +295,7 @@ export default function DashboardPage() {
                 {/* Right Column - Narrow */}
                 <div class="space-y-4">
                     {/* Forums */}
-                    <div class="rounded-xl border-2 border-edge bg-page">
+                    <div class="rounded-xl border-2 border-edge bg-page animate-fade-slide-up delay-3">
                         <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
                             <div class="flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
@@ -318,7 +333,7 @@ export default function DashboardPage() {
                     </div>
                     
                     {/* Notifications */}
-                    <div class="rounded-xl border-2 border-edge bg-page">
+                    <div class="rounded-xl border-2 border-edge bg-page animate-fade-slide-up delay-4">
                         <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
                             <div class="flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
