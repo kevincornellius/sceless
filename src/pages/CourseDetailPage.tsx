@@ -5,7 +5,7 @@ import { CourseSection } from "../types/course";
 import { loadCourseContents } from "../stores/indexeddb/courseContents";
 import { activeTabKey, getTabKey, openTabs } from "../stores/tabs";
 import { ViewModeSelector, ChronologicalView, GroupedView } from "../components/course/CourseContentView";
-import { Search } from "lucide-preact";
+import { Search, ChevronDown, ChevronRight, Sparkles } from "lucide-preact";
 import { getCourseTitle } from "../stores/indexeddb/course";
 import { markCourseSeen, clearNewModuleCount, getNewModuleIds } from "../stores/seenModules";
 
@@ -15,8 +15,8 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
     const [viewMode, setViewMode] = useState<string>("chronological");
     const [searchQuery, setSearchQuery] = useState("");
     const [newModuleIds, setNewModuleIds] = useState<number[]>([]);
+    const [showNew, setShowNew] = useState(false);
 
-    // Get course title from tabs store
     const courseTitle = getCourseTitle(courseId) || openTabs.value.find(tab => getTabKey(tab) === `course:${courseId}`)?.title || `Course ${courseId}`;
     // Filter sections/modules based on search query
     const filteredContents = useMemo(() => {
@@ -71,7 +71,52 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
         <div class="p-4 lg:p-6 h-full overflow-y-auto">
             {/* Course Title */}
             <h1 class="text-xl font-bold text-content mb-6">{courseTitle}</h1>
-            
+
+            {/* What's New — collapsible, default closed */}
+            {newModuleIds.length > 0 && (
+                <div class="rounded-xl border-2 border-edge overflow-hidden mb-4">
+                    <button
+                        onClick={() => setShowNew(v => !v)}
+                        class="w-full flex items-center gap-3 px-4 py-3 bg-page-secondary hover:bg-edge/30 transition-colors cursor-pointer"
+                    >
+                        <Sparkles class="w-4 h-4 text-primary shrink-0" />
+                        <span class="text-sm font-semibold text-content">What's New</span>
+                        <span class="text-xs px-2 py-0.5 rounded font-bold bg-primary text-on-primary">{newModuleIds.length}</span>
+                        {showNew
+                            ? <ChevronDown class="w-4 h-4 text-content-muted ml-auto" />
+                            : <ChevronRight class="w-4 h-4 text-content-muted ml-auto" />
+                        }
+                    </button>
+                    {showNew && (
+                        <div class="divide-y-2 divide-edge">
+                            {contents.map(section => {
+                                const sectionNew = section.modules.filter(m => newModuleIds.includes(m.id));
+                                if (sectionNew.length === 0) return null;
+                                return (
+                                    <div key={section.id}>
+                                        <div class="px-4 py-2 bg-page/50">
+                                            <span class="text-xs font-semibold text-content-muted">{section.name}</span>
+                                        </div>
+                                        {sectionNew.map(m => (
+                                            <a
+                                                key={m.id}
+                                                href={`${SCELE_URL}/mod/${m.modname}/view.php?id=${m.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                class="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors"
+                                            >
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-primary text-on-primary uppercase shrink-0">New</span>
+                                                <span class="text-sm font-semibold text-content">{m.name}</span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {contents.length === 0 ? (
                 <div class="text-content-muted">No course content available</div>
             ) : (
