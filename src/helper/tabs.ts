@@ -2,7 +2,14 @@ import { SCELE_URL } from "../config";
 import { CourseDetailTab } from "../pages/CourseDetailPage";
 import { DashboardTab } from "../pages/DashboardPage";
 import { Tab } from "../types/state";
-import { getCourseCode, getCourseTitle } from "../stores/indexeddb/course";
+import { getCourseCode } from "../stores/indexeddb/course";
+
+export const TasksTab: Tab = {
+	type: "tasks",
+	id: "page",
+	title: "Tasks",
+	url: `${SCELE_URL}/my`,
+};
 
 export function TabToUrl(tab: Tab): string {
 	const route = () => {
@@ -11,6 +18,8 @@ export function TabToUrl(tab: Tab): string {
 				return "";
 			case "course":
 				return `course/view.php?id=${tab.id}`;
+			case "tasks":
+				return "my";
 		}
 	};
 
@@ -21,9 +30,13 @@ export function UrlToTab(urlString: string): Tab | null {
 		const url = new URL(urlString);
 		const path = url.pathname;
 		const id = url.searchParams.get("id");
-
+		console.log("Parsing URL to tab:", urlString, "->", { path, id });
 		if (path === "/") {
 			return DashboardTab;
+		}
+
+		if (path === "/my/") {
+			return TasksTab;
 		}
 
 		if (path === "/course/view.php") {

@@ -18,6 +18,7 @@ export default defineConfig({
 	webExt: {
 		startUrls: [
 			"https://scele.cs.ui.ac.id/",
+			"https://scele.cs.ui.ac.id/my",
 			"https://scele.cs.ui.ac.id/login/index.php",
 		],
 
