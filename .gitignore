@@ -29,3 +29,6 @@ web-ext.config.ts
 # Browser Profiles
 .chrome-profile/
 .firefox-profile/
+
+.agents/
+.claude/

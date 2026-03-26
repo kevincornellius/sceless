@@ -47,6 +47,11 @@
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
+/* Moodle/SCELE uses no-overflow to clip content */
+.no-overflow {
+  overflow: hidden;
+}
+
 /* Entrance animations */
 @keyframes fadeSlideUp {
   from {

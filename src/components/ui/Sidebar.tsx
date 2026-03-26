@@ -19,6 +19,7 @@ import {
 } from "lucide-preact";
 import { ACTION_TABS } from "@/src/constants/navigation";
 import { Tab } from "@/src/types/state";
+import { newModuleCounts } from "@/src/stores/seenModules";
 
 const MIN_W = 56;
 const MAX_W = 280;
@@ -105,6 +106,7 @@ const Sidebar = () => {
 		const key = getTabKey(tab);
 		const active = activeTabKey.value === key;
 		const Icon = icon;
+		const newCount = tab.type === "course" ? ((newModuleCounts.value ?? {})[tab.id] ?? 0) : 0;
 
 		const handleClick = (e: MouseEvent) => {
 			// Open in new tab with ctrl/cmd key
@@ -137,11 +139,21 @@ const Sidebar = () => {
                 title={tab.title}
 			>
 				<Icon width={18} class="shrink-0" />
+				{!expanded && newCount > 0 && (
+					<span class="absolute bottom-1 right-1 w-3 h-3 text-[8px] font-bold rounded-full bg-primary text-on-primary flex items-center justify-center">
+						{newCount > 9 ? "9+" : newCount}
+					</span>
+				)}
 				{expanded ? (
 					<>
 						<span class="flex-1 text-left truncate pr-6">
 							{tab.title}
 						</span>
+						{newCount > 0 && (
+							<span class="shrink-0 min-w-4.5 h-4.5 text-[10px] font-bold rounded-full bg-primary text-on-primary flex items-center justify-center px-1">
+								{newCount > 99 ? "99+" : newCount}
+							</span>
+						)}
 						{closable && (
 							<button
 								onClick={(e) => {
@@ -202,10 +214,9 @@ const Sidebar = () => {
 	};
 
 	const PinnedTabs = () => {
-		console.log("Rendering PinnedTabs. Loaded:", pinnedCoursesLoaded.value, "Courses:", pinnedCourses.value);
-		if (!pinnedCoursesLoaded.value || pinnedCourses.value.length === 0) return null;
+			if (!pinnedCoursesLoaded.value || (pinnedCourses.value ?? []).length === 0) return null;
 
-		const pinnedTabs = pinnedCourses.value.map((course) => ({
+		const pinnedTabs = (pinnedCourses.value ?? []).map((course) => ({
 			type: "course",
 			id: String(course.id),
 			title: course.code || course.title,
@@ -237,7 +248,7 @@ const Sidebar = () => {
         if (!openTabsLoaded.value || !pinnedCoursesLoaded.value) return null;
 		
         const pinnedTabKeys = new Set(
-            pinnedCourses.value.map((course) => {
+            (pinnedCourses.value ?? []).map((course) => {
                 const dummyTab: Tab = { type: "course", id: String(course.id), title: "", url: "" };
                 return getTabKey(dummyTab);
             })
@@ -282,7 +293,6 @@ const Sidebar = () => {
 		);
 	};
 
-	console.log("Rendering Sidebar with tabs:", openTabs.value);
 
 	return (
 		<aside
@@ -290,9 +300,11 @@ const Sidebar = () => {
 			class={`relative shrink-0 flex flex-col py-2 gap-1 overflow-hidden ${animate ? " transition-[width] duration-200" : ""}`}
 		>
 			<Top />
+			<div class="flex-1 flex flex-col gap-1 overflow-y-auto scrollbar-thin" >
 			<Actions />
 			<PinnedTabs />
 			<OpenTabs />
+			</div>
 			<div
 				onMouseDown={handleMouseDown}
 				class={`absolute top-0 right-0 h-full w-1 transition-colors ${

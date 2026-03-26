@@ -53,7 +53,7 @@ function Notifications() {
                     e.stopPropagation();
                     setIsOpen(!isOpen);
                 }}
-                className="relative p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-page-hover hover:text-content transition-all"
+                className="relative p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-edge hover:text-content transition-all"
             >
                 <Bell className="w-4 h-4" />
                 {unreadCount > 0 && (
@@ -133,7 +133,7 @@ function ThemeSelector() {
                     e.stopPropagation();
                     setIsOpen(!isOpen);
                 }}
-                class="p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-page-hover hover:text-content transition-all"
+                class="p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-edge hover:text-content transition-all"
                 title="Change theme"
             >
                 <Palette className="w-4 h-4" />

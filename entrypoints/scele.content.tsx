@@ -11,7 +11,8 @@ export default defineContentScript({
 	cssInjectionMode: "manual",
 
 	async main() {
-		
+		console.log("[sceless] Content script main() running on:", window.location.href);
+
 		const enabled = (await enabledStorage.getValue()) ?? true;
 
 		if (!enabled) {

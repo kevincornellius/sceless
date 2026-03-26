@@ -10,21 +10,32 @@ import {
 } from "../stores/tabs";
 import { Tab } from "../types/state";
 
+// Guard: skip navigation if already on this exact tab
+let isNavigating = false;
+
 export const navigateTab = async (tab: Tab) => {
-	const tabKey = getTabKey(tab);
+	// Skip if already navigating (avoid double navigation during boot)
+	if (isNavigating) return;
+	isNavigating = true;
+	try {
+		const tabKey = getTabKey(tab);
+		const nextUrl = TabToUrl(tab);
 
-	const nextUrl = TabToUrl(tab);
-	if (window.location.href !== nextUrl) {
-		window.history.pushState(null, "", nextUrl);
+		// Skip if already on this tab
+		if (activeTabKey.value === tabKey && window.location.href === nextUrl) {
+			return;
+		}
+
+		if (window.location.href !== nextUrl) {
+			window.history.pushState(null, "", nextUrl);
+		}
+
+		await add(tab);
+		await setActive(tabKey);
+	} finally {
+		isNavigating = false;
 	}
-
-	console.log(`Navigating to tab: ${tabKey}`);
-
-	await add(tab);
-	await setActive(tabKey);
 };
-const FALLBACK_TAB_KEY = getTabKey(DashboardTab);
-
 
 export const deleteTab = async (tabKey: string) => {
 	const closedIndex = openTabs.value.findIndex(
@@ -50,13 +61,21 @@ export const getActiveTab = (): string | null => {
 
 
 let isInitialized = false;
+let bootComplete = false;
 
 export const initNavigation = async () => {
 	if (isInitialized) return;
 	isInitialized = true;
 
-	window.addEventListener("popstate", (event) => {
+	window.addEventListener("popstate", () => {
+		// Skip popstate during boot — bootCoreData handles initial navigation explicitly
+		if (!bootComplete) return;
 		const newTab = UrlToTab(window.location.href);
 		navigateTab(newTab || DashboardTab);
 	});
+};
+
+// Called from bootCoreData after navigateTab completes
+export const markBootComplete = () => {
+	bootComplete = true;
 };
