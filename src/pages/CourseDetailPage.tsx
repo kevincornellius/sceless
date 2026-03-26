@@ -7,12 +7,14 @@ import { activeTabKey, getTabKey, openTabs } from "../stores/tabs";
 import { ViewModeSelector, ChronologicalView, GroupedView } from "../components/course/CourseContentView";
 import { Search } from "lucide-preact";
 import { getCourseTitle } from "../stores/indexeddb/course";
+import { markCourseSeen, clearNewModuleCount, getNewModuleIds } from "../stores/seenModules";
 
 const CourseDetailPage = ({ courseId }: { courseId: string }) => {
     const [contents, setContents] = useState<CourseSection[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<string>("chronological");
     const [searchQuery, setSearchQuery] = useState("");
+    const [newModuleIds, setNewModuleIds] = useState<number[]>([]);
 
     // Get course title from tabs store
     const courseTitle = getCourseTitle(courseId) || openTabs.value.find(tab => getTabKey(tab) === `course:${courseId}`)?.title || `Course ${courseId}`;
@@ -38,6 +40,14 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
             setLoading(true);
             try {
                 const { contents: data } = await loadCourseContents(courseId);
+                if (data.length > 0) {
+                    // Get unseen IDs before marking as seen (so we can show badges)
+                    const unseen = await getNewModuleIds(courseId, data);
+                    setNewModuleIds(unseen);
+                    // Now mark as seen and clear badge
+                    await markCourseSeen(courseId, data);
+                    await clearNewModuleCount(courseId);
+                }
                 setContents(data);
             } catch (error) {
                 console.error("Failed to load course contents:", error);
@@ -80,7 +90,7 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
                             placeholder="Search modules..."
                             value={searchQuery}
                             onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
-                            class="w-full pl-9 pr-3 py-2 rounded-lg text-sm border-2 transition-all focus:outline-none bg-surface text-content border-edge focus:border-primary"
+                            class="w-full pl-9 pr-3 py-2 rounded-lg text-sm border-2 transition-all focus:outline-none bg-page text-content border-edge focus:border-primary"
                         />
                         {searchQuery && (
                             <button
@@ -100,9 +110,9 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
 
                     {/* Content */}
                     {viewMode === "chronological" ? (
-                        <ChronologicalView sections={filteredContents} expandAll={!!searchQuery} />
+                        <ChronologicalView sections={filteredContents} newModuleIds={newModuleIds} />
                     ) : (
-                        <GroupedView sections={filteredContents} expandAll={!!searchQuery} />
+                        <GroupedView sections={filteredContents} newModuleIds={newModuleIds} />
                     )}
                 </>
             )}

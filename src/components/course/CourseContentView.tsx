@@ -1,4 +1,4 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import {
 	BookOpen,
 	ChevronDown,
@@ -18,16 +18,8 @@ import {
 	CheckCircle,
 	Clock,
 } from "lucide-preact";
-import { Image } from "lucide-preact";
 import { SCELE_URL } from "../../config";
 import { CourseSection, CourseModule, getModuleDueDate, formatDueDate } from "../../types/course";
-
-function replaceImagesWithPlaceholder(html: string): string {
-	return html.replace(
-		/<img([^>]*)>/gi,
-		'<div class="flex items-center gap-2 p-2 my-2 bg-surface rounded-lg text-sm text-content-muted"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>Image (not supported by Sceless)</span></div>'
-	);
-}
 
 // Module type to icon mapping
 const moduleIcons: Record<string, any> = {
@@ -103,75 +95,90 @@ export function ViewModeSelector({
 	);
 }
 
-// Chronological View
-export function ChronologicalView({ sections, expandAll = false }: { sections: CourseSection[]; expandAll?: boolean }) {
-	const [expandedSections, setExpandedSections] = useState<number[]>(expandAll ? sections.map((s) => s.id) : []);
+// Replace images in injected HTML with placeholder (images require auth token)
+function replaceImagesWithPlaceholder(html: string): string {
+	return html.replace(
+		/<img([^>]*)>/gi,
+		'<div class="flex items-center gap-2 p-2 my-2 bg-page rounded-lg text-sm text-content-muted"><svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>Image (not supported by Sceless)</span></div>'
+	);
+}
 
-	// Expand all when expandAll changes to true
-	useEffect(() => {
-		if (expandAll) {
-			setExpandedSections(sections.map((s) => s.id));
-		}
-	}, [expandAll, sections]);
-
-	const toggleSection = (id: number) => {
-		setExpandedSections((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
-	};
-
+// Chronological View — always expanded (like normal Moodle)
+export function ChronologicalView({ sections, newModuleIds = [] }: { sections: CourseSection[]; newModuleIds?: number[] }) {
 	// Filter out invisible sections
 	const visibleSections = sections.filter((s) => s.visible);
+	const scrollRef = useRef<HTMLDivElement>(null);
+
+	// Scroll to #section-N on mount if hash is present
+	useEffect(() => {
+		const hash = window.location.hash;
+		if (hash && hash.startsWith("#section-")) {
+			// section.section is the sequential number (e.g. 5 in #section-5)
+			const el = scrollRef.current?.querySelector(hash);
+			if (el) {
+				setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+			}
+		}
+	}, []);
+
+	// Event delegation: intercept anchor clicks in injected HTML for hash navigation
+	const handleContainerClick = (e: MouseEvent) => {
+		const target = (e.target as HTMLElement).closest("a");
+		if (!target) return;
+
+		const href = target.getAttribute("href");
+		if (!href) return;
+
+		// Hash navigation within the page (e.g. href="#section-5")
+		if (href.startsWith("#section-")) {
+			e.preventDefault();
+			const el = scrollRef.current?.querySelector(href);
+			if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+			return;
+		}
+
+		// External/other links: let browser handle them normally
+	};
 
 	return (
-		<div class="space-y-3">
+		<div ref={scrollRef} class="space-y-3" onClick={handleContainerClick}>
 			{visibleSections.map((section) => {
 				// Filter visible modules
 				const visibleModules = section.modules.filter((m) => m.visible);
 				const moduleCount = visibleModules.length;
+				const cleanSummary = replaceImagesWithPlaceholder(section.summary || "");
 
 				return (
-					<div key={section.id} class="rounded-xl border-2 border-edge overflow-hidden bg-surface-elevated">
-						<button
-							onClick={() => toggleSection(section.id)}
-							class="w-full flex items-center justify-between px-4 py-3 bg-surface-elevated hover:bg-surface-elevated/80 transition-colors"
-						>
-							<div class="flex-1 text-left">
-								<div class="flex items-center gap-2">
-									<span class="font-semibold text-sm text-content">{section.name}</span>
-									{moduleCount > 0 && (
-										<span class="text-xs px-2 py-0.5 rounded font-semibold bg-primary/20 text-primary">
-											{moduleCount} items
-										</span>
-									)}
-								</div>
-								{/* Description could go here */}
+					<div key={section.id} id={`section-${section.section}`} class="rounded-xl border-2 border-edge overflow-hidden bg-page-secondary">
+						<div class="px-4 py-3 bg-page-secondary">
+							<div class="flex items-center gap-2">
+								<span class="font-semibold text-sm text-content">{section.name}</span>
+								{moduleCount > 0 && (
+									<span class="text-xs px-2 py-0.5 rounded font-semibold bg-primary/20 text-primary">
+										{moduleCount} items
+									</span>
+								)}
 							</div>
-							{expandedSections.includes(section.id) ? (
-								<ChevronDown class="w-4 h-4 flex-shrink-0 text-content-muted" />
-							) : (
-								<ChevronRight class="w-4 h-4 flex-shrink-0 text-content-muted" />
-							)}
-						</button>
+						</div>
 
-						{expandedSections.includes(section.id) && (
-							<div class="divide-y-2 divide-edge">
-								{/* Summary */}
-								{section.summary && (
-									<div 
-										class="px-4 py-3 text-sm text-content-muted bg-page/50"
-										dangerouslySetInnerHTML={{ __html: replaceImagesWithPlaceholder(section.summary) }}
-									/>
-								)}
-								{moduleCount === 0 ? (
-									<div class="px-4 py-6 text-center text-sm text-content-muted">
-										No content in this section
-									</div>
-								) : (
-									visibleModules.map((module) => (
-										<ModuleItem key={module.id} module={module} />
-									))
-								)}
-							</div>
-						)}
+						<div class="divide-y-2 divide-edge">
+							{/* Summary — images replaced with placeholder (require auth token) */}
+							{cleanSummary && (
+								<div
+									class="px-4 py-3 text-sm text-content-muted bg-page/50 [&_a]:text-primary [&_a]:underline"
+									dangerouslySetInnerHTML={{ __html: cleanSummary }}
+								/>
+							)}
+							{moduleCount === 0 && !cleanSummary ? (
+								<div class="px-4 py-6 text-center text-sm text-content-muted">
+									No content in this section
+								</div>
+							) : (
+								visibleModules.map((module) => (
+									<ModuleItem key={module.id} module={module} isNew={newModuleIds.includes(module.id)} />
+								))
+							)}
+						</div>
 					</div>
 				);
 			})}
@@ -180,7 +187,7 @@ export function ChronologicalView({ sections, expandAll = false }: { sections: C
 }
 
 // Grouped View
-export function GroupedView({ sections, expandAll = false }: { sections: CourseSection[]; expandAll?: boolean }) {
+export function GroupedView({ sections, newModuleIds = [] }: { sections: CourseSection[]; newModuleIds?: number[] }) {
 	// Get unique types from sections
 	const uniqueTypes = [...new Set(
 		sections
@@ -188,14 +195,7 @@ export function GroupedView({ sections, expandAll = false }: { sections: CourseS
 			.flatMap((s) => s.modules.filter((m) => m.visible).map((m) => m.modname.toLowerCase()))
 	)];
 
-	const [expandedTypes, setExpandedTypes] = useState<string[]>(expandAll ? uniqueTypes : []);
-
-	// Expand all when expandAll changes to true
-	useEffect(() => {
-		if (expandAll) {
-			setExpandedTypes(uniqueTypes);
-		}
-	}, [expandAll, uniqueTypes]);
+	const [expandedTypes, setExpandedTypes] = useState<string[]>(uniqueTypes);
 
 	const toggleType = (type: string) => {
 		setExpandedTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
@@ -241,10 +241,10 @@ export function GroupedView({ sections, expandAll = false }: { sections: CourseS
 	return (
 		<div class="space-y-3">
 			{typeInfoList.map(({ type, label, icon: Icon, items, count }) => (
-				<div key={type} class="rounded-xl border-2 border-edge overflow-hidden bg-surface-elevated">
+				<div key={type} class="rounded-xl border-2 border-edge overflow-hidden bg-page-secondary">
 					<button
 						onClick={() => toggleType(type)}
-						class="w-full flex items-center justify-between px-4 py-3 bg-surface-elevated hover:bg-surface-elevated/80 transition-colors"
+						class="w-full flex items-center justify-between px-4 py-3 bg-page-secondary hover:bg-page-secondary/80 transition-colors"
 					>
 						<div class="flex items-center gap-2">
 							<div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
@@ -265,7 +265,7 @@ export function GroupedView({ sections, expandAll = false }: { sections: CourseS
 					{expandedTypes.includes(type) && (
 						<div class="divide-y-2 divide-edge">
 							{items.map(({ module, sectionName }) => (
-								<ModuleItem key={module.id} module={module} showSection={sections.length > 1} sectionName={sectionName} />
+								<ModuleItem key={module.id} module={module} showSection={sections.length > 1} sectionName={sectionName} isNew={newModuleIds.includes(module.id)} />
 							))}
 						</div>
 					)}
@@ -280,15 +280,29 @@ function ModuleItem({
 	module,
 	showSection = false,
 	sectionName,
+	isNew = false,
 }: {
 	module: CourseModule;
 	showSection?: boolean;
 	sectionName?: string;
+	isNew?: boolean;
 }) {
 	const Icon = getModuleIcon(module.modname);
 	const modUrl = `${SCELE_URL}/mod/${module.modname}/view.php?id=${module.id}`;
 	const dueDate = getModuleDueDate(module);
 	const isOverdue = dueDate && dueDate < new Date();
+
+	// Labels render their HTML content inline — no clickable link
+	if (module.modname.toLowerCase() === "label") {
+		return (
+			<div class="px-4 py-3 border-b-2 border-edge last:border-b-0">
+				<div
+					class="text-sm text-content [&_h3]:font-bold [&_h3]:mb-2 [&_p]:mb-2 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline"
+					dangerouslySetInnerHTML={{ __html: module.description || "" }}
+				/>
+			</div>
+		);
+	}
 
 	return (
 		<a
@@ -297,12 +311,17 @@ function ModuleItem({
 			rel="noopener noreferrer"
 			class="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors cursor-pointer"
 		>
-			<div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-surface">
+			<div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-page">
 				<Icon class="w-5 h-5 text-content-muted" />
 			</div>
 			<div class="flex-1 min-w-0">
 				<div class="flex items-center gap-2">
 					<p class="font-semibold text-sm text-content truncate">{module.name}</p>
+					{isNew && (
+						<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded font-bold bg-primary text-on-primary uppercase">
+							New
+						</span>
+					)}
 				</div>
 				<p class="text-xs font-medium text-content-muted">{getModuleTypeLabel(module.modname)}{showSection && sectionName ? ` · ${sectionName}` : ""}</p>
 			</div>
