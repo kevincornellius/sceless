@@ -19,6 +19,10 @@ export interface ScheduleData {
 export const scheduleMeta = signal<ScheduleMeta | null>(null);
 export const scheduleEvents = signal<ScheduleEvent[]>([]);
 export const scheduleLoaded = signal(false);
+export const scheduleTick = signal(0);
+
+// Increment tick every minute to trigger countdown re-renders
+setInterval(() => { scheduleTick.value++; }, 60_000);
 
 // Get current and next class from loaded events
 export function getCurrentClass(): ScheduleEvent | null {

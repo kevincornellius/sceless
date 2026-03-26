@@ -3,6 +3,7 @@ import { MapPin, ChevronDown, Upload, Trash2, Calendar } from "lucide-preact";
 import {
     scheduleEvents,
     scheduleLoaded,
+    scheduleTick,
     getCurrentClass,
     getNextClass,
     saveScheduleICS,
@@ -31,6 +32,8 @@ export function ScheduleBar() {
     const events = scheduleEvents.value;
     const current = getCurrentClass();
     const next = getNextClass();
+    // Access tick to subscribe to minute updates — used in JSX below
+    void scheduleTick.value;
 
     const handleFile = async (e: Event) => {
         const file = (e.target as HTMLInputElement).files?.[0];
