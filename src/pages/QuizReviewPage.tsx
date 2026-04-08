@@ -10,6 +10,7 @@ import type {
 	QuestionVerdict,
 	RawQuestion,
 	ParsedAnswer,
+	ParsedClozeDropdown,
 } from "../types/quizReview";
 import {
 	blobToPng,
@@ -161,6 +162,236 @@ function getVerdictStyles(verdict: QuestionVerdict) {
 	}
 }
 
+const CLOZE_SELECT_CLASSES =
+	"p-1.5 border-2 border-primary/40 rounded-lg bg-primary/10 text-content text-sm font-semibold min-w-[11rem] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary";
+
+const CLOZE_INPUT_CLASSES =
+	"px-2 py-1.5 border-2 border-primary/40 rounded-lg bg-primary/10 text-content text-sm font-semibold min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary";
+
+function escapeHtmlText(value: string): string {
+	return value
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;")
+		.replaceAll("'", "&#39;");
+}
+
+function getMultianswerPrompt(selectNode: HTMLSelectElement, index: number): string {
+	const parentCell = selectNode.closest("td");
+	const row = parentCell?.closest("tr");
+	const table = row?.closest("table");
+
+	if (!row || !table || !parentCell) {
+		return `Part ${index + 1}`;
+	}
+
+	const rowCells = Array.from(row.children);
+	const cellIndex = rowCells.indexOf(parentCell);
+	const rowLabel =
+		(rowCells[0]?.textContent ?? "").replace(/\s+/g, " ").trim() ||
+		`Part ${index + 1}`;
+	const headerRow = table.querySelector("tr");
+	const headerCells = headerRow ? Array.from(headerRow.children) : [];
+	const columnLabel =
+		cellIndex >= 0
+			? (headerCells[cellIndex]?.textContent ?? "")
+					.replace(/\s+/g, " ")
+					.trim()
+			: "";
+
+	if (!columnLabel || columnLabel === rowLabel) {
+		return rowLabel;
+	}
+
+	return `${rowLabel} - ${columnLabel}`;
+}
+
+function parseFeedbackScore(scoreText: string): number | null {
+	const scoreMatch = scoreText.match(/(-?\d+(?:\.\d+)?)(?=\s*out of|\s*$)/i);
+	if (!scoreMatch) {
+		return null;
+	}
+
+	const parsed = Number(scoreMatch[1]);
+	return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseMultianswerDropdowns(formulation: HTMLElement): ParsedClozeDropdown[] {
+	const subquestions = Array.from(
+		formulation.querySelectorAll<HTMLElement>(".subquestion"),
+	);
+
+	return subquestions.map((subquestion, index) => {
+		const selectNode = subquestion.querySelector<HTMLSelectElement>("select");
+		if (!(selectNode instanceof HTMLSelectElement)) {
+			return {
+				id: `cloze-${index + 1}`,
+				prompt: `Part ${index + 1}`,
+				options: [],
+				originalSelectedValue: null,
+				originalSelectedText: "—",
+				scoreText: "",
+				score: null,
+			};
+		}
+
+		const options = Array.from(selectNode.options)
+			.filter((option) => option.value.trim() !== "")
+			.map((option) => ({
+				value: option.value,
+				label: option.textContent?.replace(/\s+/g, " ").trim() || "",
+				selected: option.selected || option.hasAttribute("selected"),
+			}));
+
+		const selectedOption =
+			options.find((option) => option.selected) ??
+			options.find((option) => option.value === selectNode.value) ??
+			null;
+		const scoreText =
+			subquestion
+				.querySelector(".feedbackspan")
+				?.textContent?.replace(/\s+/g, " ")
+				.trim() || "";
+
+		return {
+			id: selectNode.id || `cloze-${index + 1}`,
+			prompt: getMultianswerPrompt(selectNode, index),
+			options,
+			originalSelectedValue:
+				selectedOption && selectedOption.value.trim() !== ""
+					? selectedOption.value
+					: null,
+			originalSelectedText: selectedOption?.label || "—",
+			scoreText,
+			score: parseFeedbackScore(scoreText),
+		};
+	});
+}
+
+function createMultianswerRenderHtml(formulation: HTMLElement): string {
+	const renderClone = formulation.cloneNode(true) as HTMLElement;
+	renderClone.querySelectorAll(".feedbackspan").forEach((node) => node.remove());
+	renderClone.querySelectorAll(".accesshide").forEach((node) => node.remove());
+	renderClone
+		.querySelectorAll("input[type='hidden']")
+		.forEach((node) => node.remove());
+
+	Array.from(renderClone.querySelectorAll<HTMLSelectElement>("select")).forEach(
+		(selectNode) => {
+			selectNode.removeAttribute("disabled");
+			selectNode.setAttribute("class", CLOZE_SELECT_CLASSES);
+			selectNode.setAttribute("data-practice-select", "true");
+		},
+	);
+
+	Array.from(
+		renderClone.querySelectorAll<HTMLInputElement>(
+			".subquestion input:not([type='hidden'])",
+		),
+	).forEach((inputNode) => {
+		inputNode.removeAttribute("disabled");
+		inputNode.removeAttribute("readonly");
+		inputNode.setAttribute("class", CLOZE_INPUT_CLASSES);
+		inputNode.setAttribute("data-practice-input", "true");
+	});
+
+	return renderClone.innerHTML.trim();
+}
+
+function createMaskedPracticeHtml(readyToRenderHtml: string): string {
+	if (!readyToRenderHtml) {
+		return "";
+	}
+
+	const maskedContainer = document.createElement("div");
+	maskedContainer.innerHTML = readyToRenderHtml;
+
+	Array.from(maskedContainer.querySelectorAll<HTMLSelectElement>("select")).forEach(
+		(selectNode) => {
+			Array.from(selectNode.options).forEach((option) => {
+				option.removeAttribute("selected");
+			});
+
+			let emptyOption = Array.from(selectNode.options).find(
+				(option) => option.value.trim() === "",
+			);
+
+			if (!emptyOption) {
+				emptyOption = document.createElement("option");
+				emptyOption.value = "";
+				emptyOption.textContent = "Select answer";
+				selectNode.prepend(emptyOption);
+			}
+
+			emptyOption.setAttribute("selected", "selected");
+			selectNode.value = "";
+		},
+	);
+
+	Array.from(
+		maskedContainer.querySelectorAll<HTMLInputElement>(
+			".subquestion input:not([type='hidden'])",
+		),
+	).forEach((inputNode) => {
+		inputNode.value = "";
+		inputNode.setAttribute("value", "");
+		if (!inputNode.hasAttribute("placeholder")) {
+			inputNode.setAttribute("placeholder", "Type your answer");
+		}
+	});
+
+	Array.from(maskedContainer.querySelectorAll<HTMLTextAreaElement>("textarea")).forEach(
+		(textareaNode) => {
+			textareaNode.value = "";
+			textareaNode.textContent = "";
+			if (!textareaNode.hasAttribute("placeholder")) {
+				textareaNode.setAttribute("placeholder", "Type your answer");
+			}
+		},
+	);
+
+	return maskedContainer.innerHTML.trim();
+}
+
+function buildMultianswerSummaryAnswers(
+	clozeDropdowns: ParsedClozeDropdown[],
+): ParsedAnswer[] {
+	return clozeDropdowns.map((dropdown) => {
+		const hasSelection = dropdown.originalSelectedValue !== null;
+		const isIncorrect = hasSelection && dropdown.score === 0;
+		const isCorrect = hasSelection && dropdown.score !== null && dropdown.score > 0;
+
+		return {
+			labelHtml: `<p><strong>${escapeHtmlText(dropdown.prompt)}</strong></p><p>Selected: ${escapeHtmlText(dropdown.originalSelectedText)}</p>${dropdown.scoreText ? `<p>Score: ${escapeHtmlText(dropdown.scoreText)}</p>` : ""}`,
+			selected: hasSelection,
+			incorrect: isIncorrect,
+			correct: isCorrect,
+		};
+	});
+}
+
+function getQuestionPromptHtml(container: HTMLElement): string {
+	const qTextHtml = getHtml(container, ".qtext");
+	if (qTextHtml) {
+		return qTextHtml;
+	}
+
+	const formulation = container.querySelector(".formulation");
+	if (!(formulation instanceof HTMLElement)) {
+		return "";
+	}
+
+	const promptClone = formulation.cloneNode(true) as HTMLElement;
+	promptClone
+		.querySelectorAll(
+			"script, .subquestion, .feedbackspan, .accesshide, input, select, textarea, .questionflag",
+		)
+		.forEach((node) => node.remove());
+
+	return promptClone.innerHTML.trim();
+}
+
 function parseQuestion(question: RawQuestion): ParsedQuestion {
 	const container = document.createElement("div");
 	container.innerHTML = question.html || "";
@@ -172,29 +403,42 @@ function parseQuestion(question: RawQuestion): ParsedQuestion {
 		getText(container, ".state") || question.status || question.state || "";
 	const grade = getText(container, ".grade") || question.mark || "";
 	const flagged = Boolean(question.flagged);
-	const questionHtml = getHtml(container, ".qtext");
+	const questionHtml = getQuestionPromptHtml(container);
 	const feedbackHtml = getHtml(container, ".specificfeedback");
 	const rightAnswerHtml = getHtml(container, ".rightanswer");
+	const formulation = container.querySelector(".formulation");
+	const isMultianswer = question.type === "multianswer";
+	const clozeDropdowns =
+		isMultianswer && formulation instanceof HTMLElement
+			? parseMultianswerDropdowns(formulation)
+			: [];
+	const readyToRenderHtml =
+		isMultianswer && formulation instanceof HTMLElement
+			? createMultianswerRenderHtml(formulation)
+			: "";
 
-	const answers = Array.from(container.querySelectorAll(".answer > div")).map(
-		(option) => {
-			const labelNode = option.querySelector(
-				"[data-region='answer-label']",
-			);
-			const selected =
-				option.classList.contains("incorrect") ||
-				option.querySelector("input[checked]") !== null ||
-				option.querySelector("input:checked") !== null;
+	const answers =
+		isMultianswer
+			? buildMultianswerSummaryAnswers(clozeDropdowns)
+			: Array.from(container.querySelectorAll(".answer > div")).map(
+					(option) => {
+						const labelNode = option.querySelector(
+							"[data-region='answer-label']",
+						);
+						const selected =
+							option.classList.contains("incorrect") ||
+							option.querySelector("input[checked]") !== null ||
+							option.querySelector("input:checked") !== null;
 
-			return {
-				labelHtml:
-					labelNode?.innerHTML?.trim() || option.innerHTML.trim(),
-				selected,
-				incorrect: option.classList.contains("incorrect"),
-				correct: option.classList.contains("correct"),
-			};
-		},
-	);
+						return {
+							labelHtml:
+								labelNode?.innerHTML?.trim() || option.innerHTML.trim(),
+							selected,
+							incorrect: option.classList.contains("incorrect"),
+							correct: option.classList.contains("correct"),
+						};
+					},
+			  );
 
 	const { verdict, verdictLabel } = resolveVerdict(state, answers);
 
@@ -209,11 +453,18 @@ function parseQuestion(question: RawQuestion): ParsedQuestion {
 		grade,
 		flagged,
 		questionHtml,
+		readyToRenderHtml,
+		clozeDropdowns,
 		answers,
 		feedbackHtml,
 		rightAnswerHtml,
 		hasRenderedBlock: Boolean(
-			questionHtml || answers.length || feedbackHtml || rightAnswerHtml,
+			questionHtml ||
+			readyToRenderHtml ||
+			clozeDropdowns.length ||
+			answers.length ||
+			feedbackHtml ||
+			rightAnswerHtml,
 		),
 	};
 }
@@ -438,6 +689,9 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				.replaceAll("'", "&#39;");
 
 		const buildQuestionPrintHtml = (question: ParsedQuestion) => {
+			const isMultianswerQuestion =
+				question.type === "multianswer" &&
+				question.readyToRenderHtml.trim().length > 0;
 			const answerItems = question.answers
 				.map((answer) => {
 					const answerClass = answer.selected
@@ -457,6 +711,15 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			const rightAnswerHtml = question.rightAnswerHtml
 				? `<section class="panel panel-correct"><div class="section-title">Correct Answer</div><div class="richtext">${question.rightAnswerHtml}</div></section>`
 				: "";
+			const questionBodyHtml = isMultianswerQuestion
+				? `<section class="panel"><div class="section-title">Practice Table</div><div class="richtext cloze-richtext">${question.readyToRenderHtml}</div></section>`
+				: question.questionHtml
+					? `<section class="panel"><div class="richtext">${question.questionHtml}</div></section>`
+					: "";
+			const answersHtml =
+				!isMultianswerQuestion && answerItems
+					? `<section class="answers">${answerItems}</section>`
+					: "";
 
 			return `
 				<article class="question-card">
@@ -472,8 +735,8 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 						</div>
 					</header>
 					<div class="question-body">
-						${question.questionHtml ? `<section class="panel"><div class="richtext">${question.questionHtml}</div></section>` : ""}
-						${answerItems ? `<section class="answers">${answerItems}</section>` : ""}
+						${questionBodyHtml}
+						${answersHtml}
 						${feedbackHtml}
 						${rightAnswerHtml}
 					</div>
@@ -540,7 +803,6 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 					--primary-strong: #1238a8;
 					--danger: #c2410c;
 					--success: #0f766e;
-					--shadow: 0 18px 50px rgba(31, 41, 55, 0.09);
 				}
 				* { box-sizing: border-box; }
 				body {
@@ -667,7 +929,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				.question-verdict.unknown { background: #e7ebf0; color: var(--content-muted); }
 				.question-body { padding: 10px; display: grid; gap: 8px; }
 				.panel {
-					border: 1px solid color-mix(in srgb, var(--edge) 88%, white);
+					// border: 1px solid color-mix(in srgb, var(--edge) 88%, white);
 					border-radius: 10px;
 					background: var(--page-secondary);
 					padding: 9px;
@@ -726,6 +988,18 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				.richtext p:last-child { margin-bottom: 0; }
 				.richtext table { border-collapse: collapse; }
 				.richtext td, .richtext th { border: 1px solid var(--edge); padding: 4px 6px; }
+				.cloze-richtext [data-practice-select='true'],
+				.cloze-richtext [data-practice-input='true'],
+				.cloze-richtext textarea {
+					padding: 4px 8px;
+					border: 1.5px solid color-mix(in srgb, var(--primary) 42%, white);
+					border-radius: 8px;
+					background: color-mix(in srgb, var(--primary) 10%, white);
+					color: var(--content);
+					font: inherit;
+					min-width: 10rem;
+				}
+				.cloze-richtext [data-practice-select='true'] { min-width: 11rem; }
 				.richtext a { color: var(--primary); }
 				.richtext ul, .richtext ol { padding-left: 1rem; margin: 0.15rem 0 0.45rem; }
 				.richtext li { margin-bottom: 0.15rem; }
@@ -863,13 +1137,18 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 		}
 
 		const markdown = buildQuestionMarkdown(question);
+		const rootStyles = window.getComputedStyle(document.documentElement);
+		const captureBackground =
+			rootStyles.getPropertyValue("--page").trim() ||
+			rootStyles.getPropertyValue("--bg").trim() ||
+			window.getComputedStyle(questionElement).backgroundColor ||
+			"#ffffff";
 
 		try {
 			const screenshotBlob = await htmlToImageBlob(questionElement, {
 				cacheBust: true,
 				pixelRatio: Math.min(window.devicePixelRatio || 2, 2),
-				backgroundColor: window.getComputedStyle(document.body)
-					.backgroundColor,
+				backgroundColor: captureBackground,
 				filter: (node) =>
 					!(
 						node instanceof HTMLElement &&
@@ -1089,12 +1368,23 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 
 								const isRevealed =
 									answeredRevealed[question.slot] ?? false;
+								const isMultianswerPractice =
+									question.type === "multianswer" &&
+									question.readyToRenderHtml.length > 0;
+								const hidePracticeAnswers =
+									studyModeActive && !isRevealed;
+								const practiceHtml =
+									hidePracticeAnswers && isMultianswerPractice
+										? createMaskedPracticeHtml(
+												question.readyToRenderHtml,
+										  )
+										: question.readyToRenderHtml;
 
 								return (
 									<article
 										key={`${question.slot}-${question.page}`}
 										id={`question-${question.slot}`}
-										class="scroll-mt-4 rounded-2xl border-2 border-edge bg-page overflow-hidden shadow-sm"
+										class="scroll-mt-4 rounded-2xl border-2 border-edge bg-page overflow-hidden"
 									>
 										<div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 bg-page-secondary border-b-2 border-edge">
 											<div class="flex flex-wrap items-center gap-2">
@@ -1155,17 +1445,49 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 										</div>
 
 										<div class="p-3 space-y-3">
-											{question.questionHtml && (
-												<section class="rounded-xl border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
-													<div
-														dangerouslySetInnerHTML={{
-															__html: question.questionHtml,
-														}}
-													/>
+											{isMultianswerPractice ? (
+												<section class="space-y-2">
+													<div class="text-[10px] flex items-center gap-2 font-semibold uppercase tracking-wide text-content-muted">
+														Practice Table
+														{studyModeActive && (
+															<button
+																type="button"
+																class="rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+																onClick={() =>
+																	toogleRevealAnswer(question.slot)
+																}
+																aria-label={`Reveal answer for question ${question.questionNumber}`}
+															>
+																{isRevealed
+																	? "HIDE ANSWER"
+																	: "REVEAL ANSWER"}
+															</button>
+														)}
+													</div>
+													<div class="rounded-xl border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-edge [&_th]:bg-page [&_th]:px-2 [&_th]:py-1.5 [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1.5 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
+														<div
+															dangerouslySetInnerHTML={{
+																__html: practiceHtml,
+															}}
+														/>
+													</div>
+
+
 												</section>
+											) : (
+												question.questionHtml && (
+													<section class="rounded-xl border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
+														<div
+															dangerouslySetInnerHTML={{
+																__html: question.questionHtml,
+															}}
+														/>
+													</section>
+												)
 											)}
 
-											{question.answers.length > 0 && (
+											{!isMultianswerPractice &&
+												question.answers.length > 0 && (
 												<section class="space-y-1.5">
 													<div class="text-[10px] flex items-center gap-2 font-semibold uppercase tracking-wide text-content-muted">
 														Answers

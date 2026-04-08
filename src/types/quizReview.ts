@@ -30,6 +30,22 @@ export interface ParsedAnswer {
 	correct: boolean;
 }
 
+export interface ParsedClozeOption {
+	value: string;
+	label: string;
+	selected: boolean;
+}
+
+export interface ParsedClozeDropdown {
+	id: string;
+	prompt: string;
+	options: ParsedClozeOption[];
+	originalSelectedValue: string | null;
+	originalSelectedText: string;
+	scoreText: string;
+	score: number | null;
+}
+
 export type QuestionVerdict = "correct" | "incorrect" | "partial" | "unknown";
 
 export interface ParsedQuestion {
@@ -43,6 +59,8 @@ export interface ParsedQuestion {
 	grade: string;
 	flagged: boolean;
 	questionHtml: string;
+	readyToRenderHtml: string;
+	clozeDropdowns: ParsedClozeDropdown[];
 	answers: ParsedAnswer[];
 	feedbackHtml: string;
 	rightAnswerHtml: string;
