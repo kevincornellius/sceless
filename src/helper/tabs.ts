@@ -4,6 +4,15 @@ import { DashboardTab } from "../pages/DashboardPage";
 import { Tab } from "../types/state";
 import { getCourseCode } from "../stores/indexeddb/course";
 
+export function QuizReviewTab(attemptId: string): Tab {
+	return {
+		type: "quiz-review",
+		id: attemptId,
+		title: `Quiz Review ${attemptId}`,
+		url: `${SCELE_URL}/mod/quiz/review.php?attempt=${attemptId}`,
+	};
+}
+
 export const TasksTab: Tab = {
 	type: "tasks",
 	id: "page",
@@ -18,6 +27,8 @@ export function TabToUrl(tab: Tab): string {
 				return "";
 			case "course":
 				return `course/view.php?id=${tab.id}`;
+				case "quiz-review":
+					return `mod/quiz/review.php?attempt=${tab.id}`;
 			case "tasks":
 				return "my";
 		}
@@ -43,6 +54,12 @@ export function UrlToTab(urlString: string): Tab | null {
 			if (!id) return DashboardTab;
 			const courseTitle = getCourseCode(id) || `Course ${id}`;
 			return CourseDetailTab(id, courseTitle);
+		}
+
+		if (path === "/mod/quiz/review.php") {
+			const attemptId = url.searchParams.get("attempt");
+			if (!attemptId || !Number.isFinite(Number(attemptId))) return DashboardTab;
+			return QuizReviewTab(String(Number(attemptId)));
 		}
 
 		if (path === "/mod/forum/view.php") {

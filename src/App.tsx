@@ -4,6 +4,7 @@ import DashboardPage, { DashboardTab } from "./pages/DashboardPage";
 import TasksPage from "./pages/TasksPage";
 import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
+import QuizReviewPage from "./pages/QuizReviewPage";
 import { initializeTheme } from "./stores/theme";
 import { initNavigation, navigateTab, markBootComplete } from "./routing/router";
 import { initAuthStore, wsToken } from "./stores/auth";
@@ -29,6 +30,8 @@ const getPageFromActiveTabKey = (): ComponentChildren => {
 			return <DashboardPage />;
 		case "course":
 			return <CourseDetailPage courseId={id} />;
+        case "quiz-review":
+            return <QuizReviewPage attemptId={id} />;
 		case "tasks":
 			return <TasksPage />;
 		default:

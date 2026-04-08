@@ -23,6 +23,7 @@
 	},
 	"dependencies": {
 		"@preact/signals": "^2.8.1",
+		"html-to-image": "^1.11.13",
 		"lucide-preact": "^0.576.0",
 		"preact": "^10.28.4"
 	}
