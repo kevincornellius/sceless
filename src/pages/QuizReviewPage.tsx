@@ -2,8 +2,24 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { CheckCircle2, CircleHelp, XCircle } from "lucide-preact";
 import { toBlob as htmlToImageBlob } from "html-to-image";
 import { getAttemptReview } from "../data/adapter/moodlews/quiz";
-import type { QuizReviewPageProps, QuizReviewPayload, ParsedQuestion, ParsedReview, QuestionVerdict, RawQuestion, ParsedAnswer} from "../types/quizReview";
-import { blobToPng, getHtml, getText, buildQuestionMarkdown, fetchImageBlob, collectImageSources, CopyStatus } from "../helper/quizReview";
+import type {
+	QuizReviewPageProps,
+	QuizReviewPayload,
+	ParsedQuestion,
+	ParsedReview,
+	QuestionVerdict,
+	RawQuestion,
+	ParsedAnswer,
+} from "../types/quizReview";
+import {
+	blobToPng,
+	getHtml,
+	getText,
+	buildQuestionMarkdown,
+	fetchImageBlob,
+	collectImageSources,
+	CopyStatus,
+} from "../helper/quizReview";
 
 function formatUnixTime(value: number | null): string {
 	if (value === null || Number.isNaN(value)) {
@@ -16,7 +32,10 @@ function formatUnixTime(value: number | null): string {
 	}).format(new Date(value * 1000));
 }
 
-function getAttemptNumber(attempt: Record<string, unknown>, key: string): number | null {
+function getAttemptNumber(
+	attempt: Record<string, unknown>,
+	key: string,
+): number | null {
 	const value = attempt[key];
 	if (typeof value === "number" && Number.isFinite(value)) {
 		return value;
@@ -31,21 +50,33 @@ function findScrollContainer(element: HTMLElement): HTMLElement {
 	while (current) {
 		const style = window.getComputedStyle(current);
 
-		if (/(auto|scroll|overlay)/.test(style.overflowY) && current.scrollHeight > current.clientHeight) {
+		if (
+			/(auto|scroll|overlay)/.test(style.overflowY) &&
+			current.scrollHeight > current.clientHeight
+		) {
 			return current;
 		}
 
 		current = current.parentElement;
 	}
 
-	return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : document.documentElement;
+	return document.scrollingElement instanceof HTMLElement
+		? document.scrollingElement
+		: document.documentElement;
 }
 
 function scrollQuestionIntoView(element: HTMLElement) {
 	const container = findScrollContainer(element);
-	const start = container === document.documentElement || container === document.body ? window.scrollY : container.scrollTop;
-	const containerTop = container === document.documentElement || container === document.body ? 0 : container.getBoundingClientRect().top;
-	const targetTop = element.getBoundingClientRect().top - containerTop + start - 72;
+	const start =
+		container === document.documentElement || container === document.body
+			? window.scrollY
+			: container.scrollTop;
+	const containerTop =
+		container === document.documentElement || container === document.body
+			? 0
+			: container.getBoundingClientRect().top;
+	const targetTop =
+		element.getBoundingClientRect().top - containerTop + start - 72;
 	const distance = targetTop - start;
 	const duration = 140;
 	const startTime = performance.now();
@@ -55,7 +86,10 @@ function scrollQuestionIntoView(element: HTMLElement) {
 		const eased = 1 - Math.pow(1 - progress, 3);
 		const nextPosition = start + distance * eased;
 
-		if (container === document.documentElement || container === document.body) {
+		if (
+			container === document.documentElement ||
+			container === document.body
+		) {
 			window.scrollTo(0, nextPosition);
 		} else {
 			container.scrollTop = nextPosition;
@@ -69,7 +103,10 @@ function scrollQuestionIntoView(element: HTMLElement) {
 	requestAnimationFrame(animate);
 }
 
-function resolveVerdict(state: string, answers: ParsedAnswer[]): { verdict: QuestionVerdict; verdictLabel: string } {
+function resolveVerdict(
+	state: string,
+	answers: ParsedAnswer[],
+): { verdict: QuestionVerdict; verdictLabel: string } {
 	const normalized = state.toLowerCase();
 
 	if (normalized.includes("incorrect")) {
@@ -129,28 +166,35 @@ function parseQuestion(question: RawQuestion): ParsedQuestion {
 	container.innerHTML = question.html || "";
 	container.querySelectorAll("script").forEach((node) => node.remove());
 
-	const questionNumber = getText(container, ".qno") || String(question.number ?? question.slot);
-	const state = getText(container, ".state") || question.status || question.state || "";
+	const questionNumber =
+		getText(container, ".qno") || String(question.number ?? question.slot);
+	const state =
+		getText(container, ".state") || question.status || question.state || "";
 	const grade = getText(container, ".grade") || question.mark || "";
 	const flagged = Boolean(question.flagged);
 	const questionHtml = getHtml(container, ".qtext");
 	const feedbackHtml = getHtml(container, ".specificfeedback");
 	const rightAnswerHtml = getHtml(container, ".rightanswer");
 
-	const answers = Array.from(container.querySelectorAll(".answer > div")).map((option) => {
-		const labelNode = option.querySelector("[data-region='answer-label']");
-		const selected =
-			option.classList.contains("incorrect") ||
-			option.querySelector("input[checked]") !== null ||
-			option.querySelector("input:checked") !== null;
+	const answers = Array.from(container.querySelectorAll(".answer > div")).map(
+		(option) => {
+			const labelNode = option.querySelector(
+				"[data-region='answer-label']",
+			);
+			const selected =
+				option.classList.contains("incorrect") ||
+				option.querySelector("input[checked]") !== null ||
+				option.querySelector("input:checked") !== null;
 
-		return {
-			labelHtml: labelNode?.innerHTML?.trim() || option.innerHTML.trim(),
-			selected,
-			incorrect: option.classList.contains("incorrect"),
-			correct: option.classList.contains("correct"),
-		};
-	});
+			return {
+				labelHtml:
+					labelNode?.innerHTML?.trim() || option.innerHTML.trim(),
+				selected,
+				incorrect: option.classList.contains("incorrect"),
+				correct: option.classList.contains("correct"),
+			};
+		},
+	);
 
 	const { verdict, verdictLabel } = resolveVerdict(state, answers);
 
@@ -168,7 +212,9 @@ function parseQuestion(question: RawQuestion): ParsedQuestion {
 		answers,
 		feedbackHtml,
 		rightAnswerHtml,
-		hasRenderedBlock: Boolean(questionHtml || answers.length || feedbackHtml || rightAnswerHtml),
+		hasRenderedBlock: Boolean(
+			questionHtml || answers.length || feedbackHtml || rightAnswerHtml,
+		),
 	};
 }
 
@@ -192,7 +238,10 @@ function parseReview(review: QuizReviewPayload): ParsedReview {
 		questionCount: questions.length,
 		timestart,
 		timefinish,
-		sumgrades: typeof sumgrades === "number" ? sumgrades : String(sumgrades ?? "—"),
+		sumgrades:
+			typeof sumgrades === "number"
+				? sumgrades
+				: String(sumgrades ?? "—"),
 		questions,
 	};
 }
@@ -202,10 +251,24 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [showOneQuestionAtATime, setShowOneQuestionAtATime] = useState(false);
-	const [activeQuestionSlot, setActiveQuestionSlot] = useState<number | null>(null);
-	const [copiedQuestionStatus, setCopiedQuestionStatus] = useState<CopyStatus | null>(null);
+	const [studyModeActive, setStudyModeActive] = useState(false);
+	const [answeredRevealed, setAnsweredRevealed] = useState<
+		Record<number, boolean>
+	>({});
+	const [activeQuestionSlot, setActiveQuestionSlot] = useState<number | null>(
+		null,
+	);
+	const [copiedQuestionStatus, setCopiedQuestionStatus] =
+		useState<CopyStatus | null>(null);
 	const pageContainerRef = useRef<HTMLDivElement>(null);
 	const copiedResetTimerRef = useRef<number | null>(null);
+
+	const toogleRevealAnswer = (questionSlot: number) => {
+		setAnsweredRevealed((current) => ({
+			...current,
+			[questionSlot]: !current[questionSlot],
+		}));
+	};
 
 	useEffect(() => {
 		let cancelled = false;
@@ -215,9 +278,17 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			setError(null);
 
 			try {
-				const pageParam = new URLSearchParams(window.location.search).get("page");
-				const page = pageParam !== null && Number.isFinite(Number(pageParam)) ? Number(pageParam) : -1;
-				const payload = (await getAttemptReview(Number(attemptId), page)) as QuizReviewPayload | undefined;
+				const pageParam = new URLSearchParams(
+					window.location.search,
+				).get("page");
+				const page =
+					pageParam !== null && Number.isFinite(Number(pageParam))
+						? Number(pageParam)
+						: -1;
+				const payload = (await getAttemptReview(
+					Number(attemptId),
+					page,
+				)) as QuizReviewPayload | undefined;
 
 				if (cancelled) return;
 
@@ -231,7 +302,11 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			} catch (err) {
 				if (cancelled) return;
 
-				setError(err instanceof Error ? err.message : "Failed to load quiz review.");
+				setError(
+					err instanceof Error
+						? err.message
+						: "Failed to load quiz review.",
+				);
 				setReview(null);
 			} finally {
 				if (!cancelled) {
@@ -258,7 +333,9 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				return review.questions[0].slot;
 			}
 
-			if (!review.questions.some((question) => question.slot === current)) {
+			if (
+				!review.questions.some((question) => question.slot === current)
+			) {
 				return review.questions[0].slot;
 			}
 
@@ -275,10 +352,22 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 	}, []);
 
 	const activeQuestion =
-		review?.questions.find((question) => question.slot === activeQuestionSlot) ?? review?.questions[0] ?? null;
-	const activeQuestionIndex = review && activeQuestion ? review.questions.findIndex((question) => question.slot === activeQuestion.slot) : -1;
+		review?.questions.find(
+			(question) => question.slot === activeQuestionSlot,
+		) ??
+		review?.questions[0] ??
+		null;
+	const activeQuestionIndex =
+		review && activeQuestion
+			? review.questions.findIndex(
+					(question) => question.slot === activeQuestion.slot,
+				)
+			: -1;
 	const hasPreviousQuestion = activeQuestionIndex > 0;
-	const hasNextQuestion = review !== null && activeQuestionIndex >= 0 && activeQuestionIndex < review.questions.length - 1;
+	const hasNextQuestion =
+		review !== null &&
+		activeQuestionIndex >= 0 &&
+		activeQuestionIndex < review.questions.length - 1;
 
 	const selectQuestion = (questionSlot: number) => {
 		setActiveQuestionSlot(questionSlot);
@@ -302,7 +391,11 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 	};
 
 	const goToNextQuestion = () => {
-		if (!review || activeQuestionIndex < 0 || activeQuestionIndex >= review.questions.length - 1) {
+		if (
+			!review ||
+			activeQuestionIndex < 0 ||
+			activeQuestionIndex >= review.questions.length - 1
+		) {
 			return;
 		}
 
@@ -347,16 +440,23 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 		const buildQuestionPrintHtml = (question: ParsedQuestion) => {
 			const answerItems = question.answers
 				.map((answer) => {
-					const answerClass = answer.selected ? (answer.incorrect ? "answer answer-incorrect" : "answer answer-selected") : "answer";
+					const answerClass = answer.selected
+						? answer.incorrect
+							? "answer answer-incorrect"
+							: "answer answer-selected"
+						: "answer";
 					const answerHtml = answer.labelHtml.trim();
-
 
 					return `<div class="${answerClass}"><div class="answer-bullet"></div><div class="answer-body">${answerHtml}</div></div>`;
 				})
 				.join("");
 
-			const feedbackHtml = question.feedbackHtml ? `<section class="panel panel-muted"><div class="section-title">Feedback</div><div class="richtext">${question.feedbackHtml}</div></section>` : "";
-			const rightAnswerHtml = question.rightAnswerHtml ? `<section class="panel panel-correct"><div class="section-title">Correct Answer</div><div class="richtext">${question.rightAnswerHtml}</div></section>` : "";
+			const feedbackHtml = question.feedbackHtml
+				? `<section class="panel panel-muted"><div class="section-title">Feedback</div><div class="richtext">${question.feedbackHtml}</div></section>`
+				: "";
+			const rightAnswerHtml = question.rightAnswerHtml
+				? `<section class="panel panel-correct"><div class="section-title">Correct Answer</div><div class="richtext">${question.rightAnswerHtml}</div></section>`
+				: "";
 
 			return `
 				<article class="question-card">
@@ -642,53 +742,83 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 		</body>
 		</html>`;
 
-		iframe.addEventListener("load", () => {
-			const frameWindow = iframe.contentWindow;
-			const frameDocument = iframe.contentDocument;
+		iframe.addEventListener(
+			"load",
+			() => {
+				const frameWindow = iframe.contentWindow;
+				const frameDocument = iframe.contentDocument;
 
-			if (!frameWindow || !frameDocument) {
-				cleanup();
-				return;
-			}
-
-			const waitForImages = Array.from(frameDocument.images).map((image) => {
-				if (image.complete) {
-					return Promise.resolve();
+				if (!frameWindow || !frameDocument) {
+					cleanup();
+					return;
 				}
 
-				return new Promise<void>((resolve) => {
-					image.addEventListener("load", () => resolve(), { once: true });
-					image.addEventListener("error", () => resolve(), { once: true });
+				const waitForImages = Array.from(frameDocument.images).map(
+					(image) => {
+						if (image.complete) {
+							return Promise.resolve();
+						}
+
+						return new Promise<void>((resolve) => {
+							image.addEventListener("load", () => resolve(), {
+								once: true,
+							});
+							image.addEventListener("error", () => resolve(), {
+								once: true,
+							});
+						});
+					},
+				);
+
+				const handleAfterPrint = () => {
+					frameWindow.removeEventListener(
+						"afterprint",
+						handleAfterPrint,
+					);
+					cleanup();
+				};
+
+				frameWindow.addEventListener("afterprint", handleAfterPrint);
+				Promise.all(waitForImages).then(() => {
+					frameWindow.focus();
+					frameWindow.print();
+					window.setTimeout(cleanup, 1000);
 				});
-			});
-
-			const handleAfterPrint = () => {
-				frameWindow.removeEventListener("afterprint", handleAfterPrint);
-				cleanup();
-			};
-
-			frameWindow.addEventListener("afterprint", handleAfterPrint);
-			Promise.all(waitForImages).then(() => {
-				frameWindow.focus();
-				frameWindow.print();
-				window.setTimeout(cleanup, 1000);
-			});
-		}, { once: true });
+			},
+			{ once: true },
+		);
 
 		iframe.srcdoc = html;
 	};
 
-	const copyQuestionMarkdownToClipboard = async (question: ParsedQuestion) => {
+	const copyQuestionMarkdownToClipboard = async (
+		question: ParsedQuestion,
+	) => {
 		const markdown = buildQuestionMarkdown(question);
-		const imageSources = collectImageSources(question.questionHtml, ...question.answers.map((answer) => answer.labelHtml), question.feedbackHtml, question.rightAnswerHtml);
+		const imageSources = collectImageSources(
+			question.questionHtml,
+			...question.answers.map((answer) => answer.labelHtml),
+			question.feedbackHtml,
+			question.rightAnswerHtml,
+		);
 		const firstImageSource = imageSources[0] ?? null;
 		const clipboardPayload: Record<string, Blob> = {
 			"text/plain": new Blob([markdown], { type: "text/plain" }),
 		};
 
 		try {
-			if (typeof ClipboardItem !== "undefined" && "supports" in ClipboardItem && (ClipboardItem as typeof ClipboardItem & { supports?: (type: string) => boolean }).supports?.("text/markdown")) {
-				clipboardPayload["text/markdown"] = new Blob([markdown], { type: "text/markdown" });
+			if (
+				typeof ClipboardItem !== "undefined" &&
+				"supports" in ClipboardItem &&
+				(
+					ClipboardItem as typeof ClipboardItem & {
+						supports?: (type: string) => boolean;
+					}
+				).supports?.("text/markdown")
+			) {
+				clipboardPayload["text/markdown"] = new Blob([markdown], {
+					type: "text/markdown",
+				});
 			}
 
 			if (firstImageSource) {
@@ -698,8 +828,13 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				}
 			}
 
-			if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
-				await navigator.clipboard.write([new ClipboardItem(clipboardPayload)]);
+			if (
+				navigator.clipboard?.write &&
+				typeof ClipboardItem !== "undefined"
+			) {
+				await navigator.clipboard.write([
+					new ClipboardItem(clipboardPayload),
+				]);
 			} else if (navigator.clipboard?.writeText) {
 				await navigator.clipboard.writeText(markdown);
 			}
@@ -716,8 +851,12 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 		}
 	};
 
-	const copyQuestionScreenshotToClipboard = async (question: ParsedQuestion) => {
-		const questionElement = document.getElementById(`question-${question.slot}`);
+	const copyQuestionScreenshotToClipboard = async (
+		question: ParsedQuestion,
+	) => {
+		const questionElement = document.getElementById(
+			`question-${question.slot}`,
+		);
 
 		if (!(questionElement instanceof HTMLElement)) {
 			return;
@@ -729,8 +868,13 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			const screenshotBlob = await htmlToImageBlob(questionElement, {
 				cacheBust: true,
 				pixelRatio: Math.min(window.devicePixelRatio || 2, 2),
-				backgroundColor: window.getComputedStyle(document.body).backgroundColor,
-				filter: (node) => !(node instanceof HTMLElement && node.dataset.copyExclude === "true"),
+				backgroundColor: window.getComputedStyle(document.body)
+					.backgroundColor,
+				filter: (node) =>
+					!(
+						node instanceof HTMLElement &&
+						node.dataset.copyExclude === "true"
+					),
 			});
 
 			const clipboardPayload: Record<string, Blob> = {
@@ -741,8 +885,13 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				clipboardPayload["image/png"] = screenshotBlob;
 			}
 
-			if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
-				await navigator.clipboard.write([new ClipboardItem(clipboardPayload)]);
+			if (
+				navigator.clipboard?.write &&
+				typeof ClipboardItem !== "undefined"
+			) {
+				await navigator.clipboard.write([
+					new ClipboardItem(clipboardPayload),
+				]);
 			} else if (navigator.clipboard?.writeText) {
 				await navigator.clipboard.writeText(markdown);
 			}
@@ -758,17 +907,27 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			console.error("Failed to copy question screenshot", copyError);
 		}
 	};
-	const questionsToRender = review ? (showOneQuestionAtATime && activeQuestion ? [activeQuestion] : review.questions) : [];
+	const questionsToRender = review
+		? showOneQuestionAtATime && activeQuestion
+			? [activeQuestion]
+			: review.questions
+		: [];
 
 	return (
 		<div ref={pageContainerRef} class="p-4 lg:p-6 h-full overflow-y-auto">
 			<div class="mb-4 flex flex-col gap-3">
 				<div class="flex flex-wrap items-center gap-3">
-					<h1 class="text-xl font-bold text-content">Quiz Review {attemptId}</h1>
+					<h1 class="text-xl font-bold text-content">
+						Quiz Review {attemptId}
+					</h1>
 					{review && (
 						<>
-							<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">{review.grade}</span>
-							<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-edge text-content-muted capitalize">{review.state}</span>
+							<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">
+								{review.grade}
+							</span>
+							<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-edge text-content-muted capitalize">
+								{review.state}
+							</span>
 						</>
 					)}
 				</div>
@@ -779,101 +938,157 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 					<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
 				</div>
 			) : error ? (
-				<div class="rounded-xl border-2 border-danger bg-danger/10 p-4 text-sm text-danger">{error}</div>
+				<div class="rounded-xl border-2 border-danger bg-danger/10 p-4 text-sm text-danger">
+					{error}
+				</div>
 			) : review ? (
 				<div class="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)] gap-4 items-start">
 					<div class="space-y-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto print:hidden">
-						
-                        <aside class="rounded-2xl border-2 border-edge bg-page-secondary p-3 flex-1 min-h-0">
-						<div class="flex items-center justify-between gap-2 mb-3">
-							<div>
-								<div class="text-sm font-semibold text-content">Questions</div>
+						<aside class="rounded-2xl border-2 border-edge bg-page-secondary p-3 flex-1 min-h-0">
+							<div class="flex items-center justify-between gap-2 mb-3">
+								<div>
+									<div class="text-sm font-semibold text-content">
+										Questions
+									</div>
+								</div>
 							</div>
-						</div>
-						<div class="grid grid-cols-[repeat(auto-fit,32px)] gap-1">
-							{review.questions.map((question) => {
-								const verdictStyles = getVerdictStyles(question.verdict);
+							<div class="grid grid-cols-[repeat(auto-fit,32px)] gap-1">
+								{review.questions.map((question) => {
+									const verdictStyles = getVerdictStyles(
+										question.verdict,
+									);
 
-								return (
-									<button
-										key={`nav-${question.slot}-${question.page}`}
-										type="button"
-										onClick={() => {
-											selectQuestion(question.slot);
+									return (
+										<button
+											key={`nav-${question.slot}-${question.page}`}
+											type="button"
+											onClick={() => {
+												selectQuestion(question.slot);
 
-											if (showOneQuestionAtATime) {
-												return;
-											}
+												if (showOneQuestionAtATime) {
+													return;
+												}
 
-											const target = document.getElementById(`question-${question.slot}`);
+												const target =
+													document.getElementById(
+														`question-${question.slot}`,
+													);
 
-											if (target instanceof HTMLElement) {
-												scrollQuestionIntoView(target);
-											}
-										}}
-										class={`group rounded-lg border-2 transition-all duration-150 w-8 h-8 p-0 hover:-translate-y-0.5 hover:shadow-sm hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${question.slot === activeQuestionSlot ? "ring-2 ring-primary/40" : ""} ${question.flagged ? "border-r-4 border-r-amber-400" : ""} ${verdictStyles.chip}`}
-										title={`Question ${question.questionNumber}: ${question.verdictLabel}`}
-									>
-										<div class="flex h-full items-center justify-center">
-											<span class="text-[11px] font-bold leading-none">{question.questionNumber}</span>
-										</div>
-									</button>
-								);
-							})}
-						</div>
+												if (
+													target instanceof
+													HTMLElement
+												) {
+													scrollQuestionIntoView(
+														target,
+													);
+												}
+											}}
+											class={`group rounded-lg border-2 transition-all duration-150 w-8 h-8 p-0 hover:-translate-y-0.5 hover:shadow-sm hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${question.flagged ? "border-r-4 border-r-amber-400" : ""} ${verdictStyles.chip}`}
+											title={`Question ${question.questionNumber}: ${question.verdictLabel}`}
+										>
+											<div class="flex h-full items-center justify-center">
+												<span class="text-[11px] font-bold leading-none">
+													{question.questionNumber}
+												</span>
+											</div>
+										</button>
+									);
+								})}
+							</div>
 						</aside>
-                        <aside class="rounded-2xl border-2 border-edge bg-page-secondary p-3">
-						<div class="mb-3 flex items-center justify-between gap-2">
-							<div class="text-sm font-semibold text-content">Review</div>
+						<aside class="rounded-2xl border-2 border-edge bg-page-secondary p-3">
+							<div class="mb-3 flex items-center justify-between gap-2">
+								<div class="text-sm font-semibold text-content">
+									Review
+								</div>
+								<button
+									type="button"
+									onClick={() =>
+										setShowOneQuestionAtATime(
+											(current) => !current,
+										)
+									}
+									aria-pressed={showOneQuestionAtATime}
+									class={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${showOneQuestionAtATime ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page text-content-muted"}`}
+								>
+									One at a time
+								</button>
+								<button
+									type="button"
+									onClick={() =>
+										setStudyModeActive(
+											(current) => !current,
+										)
+									}
+									aria-pressed={studyModeActive}
+									class={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${studyModeActive ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page text-content-muted"}`}
+								>
+									Study Mode
+								</button>
+							</div>
+
 							<button
 								type="button"
-								onClick={() => setShowOneQuestionAtATime((current) => !current)}
-								aria-pressed={showOneQuestionAtATime}
-								class={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${showOneQuestionAtATime ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page text-content-muted"}`}
+								onClick={exportQuizToPdf}
+								class="mb-3 w-full rounded-xl border-2 border-primary bg-primary/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/15 print:hidden"
 							>
-								One at a time
+								EXPORT QUIZ TO PDF
 							</button>
-						</div>
 
-						<button
-							type="button"
-							onClick={exportQuizToPdf}
-							class="mb-3 w-full rounded-xl border-2 border-primary bg-primary/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/15 print:hidden"
-						>
-							EXPORT QUIZ TO PDF
-						</button>
-
-						<div class="grid grid-cols-2 gap-1.5">
-							<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
-								<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">Attempt</div>
-								<div class="text-[11px] font-semibold text-content leading-tight">{review.attemptLabel}</div>
+							<div class="grid grid-cols-2 gap-1.5">
+								<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
+									<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">
+										Attempt
+									</div>
+									<div class="text-[11px] font-semibold text-content leading-tight">
+										{review.attemptLabel}
+									</div>
+								</div>
+								<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
+									<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">
+										Questions
+									</div>
+									<div class="text-[11px] font-semibold text-content leading-tight">
+										{review.questionCount}
+									</div>
+								</div>
+								<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
+									<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">
+										Sum Grades
+									</div>
+									<div class="text-[11px] font-semibold text-content leading-tight">
+										{String(review.sumgrades)}
+									</div>
+								</div>
+								<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
+									<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">
+										Time Start
+									</div>
+									<div class="text-[11px] font-semibold text-content leading-tight">
+										{formatUnixTime(review.timestart)}
+									</div>
+								</div>
+								<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
+									<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">
+										Time Finish
+									</div>
+									<div class="text-[11px] font-semibold text-content leading-tight">
+										{formatUnixTime(review.timefinish)}
+									</div>
+								</div>
 							</div>
-							<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
-								<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">Questions</div>
-								<div class="text-[11px] font-semibold text-content leading-tight">{review.questionCount}</div>
-							</div>
-							<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
-								<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">Sum Grades</div>
-								<div class="text-[11px] font-semibold text-content leading-tight">{String(review.sumgrades)}</div>
-							</div>
-							<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
-								<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">Time Start</div>
-								<div class="text-[11px] font-semibold text-content leading-tight">{formatUnixTime(review.timestart)}</div>
-							</div>
-							<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
-								<div class="text-[8px] font-semibold uppercase tracking-wide text-content-muted leading-none">Time Finish</div>
-								<div class="text-[11px] font-semibold text-content leading-tight">{formatUnixTime(review.timefinish)}</div>
-							</div>
-						</div>
 						</aside>
-
-						
 					</div>
 
 					<div class="space-y-4">
 						<div class="space-y-3">
 							{questionsToRender.map((question) => {
-								const verdictStyles = getVerdictStyles(question.verdict);
+								const verdictStyles = getVerdictStyles(
+									question.verdict,
+								);
+
+								const isRevealed =
+									answeredRevealed[question.slot] ?? false;
 
 								return (
 									<article
@@ -883,39 +1098,58 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 									>
 										<div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 bg-page-secondary border-b-2 border-edge">
 											<div class="flex flex-wrap items-center gap-2">
-												<span class={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-primary text-on-primary uppercase ${question.flagged ? "border-r-4 border-r-amber-400" : ""}`}>
+												<span
+													class={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-primary text-on-primary uppercase ${question.flagged ? "border-r-4 border-r-amber-400" : ""}`}
+												>
 													Q{question.questionNumber}
 												</span>
 												{question.grade && (
-													<span class="text-[10px] font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">{question.grade}</span>
+													<span class="text-[10px] font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">
+														{question.grade}
+													</span>
 												)}
-												<span class={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wide ${verdictStyles.badge}`}>
+												<span
+													class={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wide ${verdictStyles.badge}`}
+												>
 													{question.verdictLabel}
 												</span>
 											</div>
 											<div class="flex items-center gap-2 print:hidden">
-												
 												<button
 													type="button"
 													onClick={() => {
-														void copyQuestionMarkdownToClipboard(question);
+														void copyQuestionMarkdownToClipboard(
+															question,
+														);
 													}}
 													data-copy-exclude="true"
 													class={`rounded-lg cursor-pointer border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "markdown" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
 													aria-label={`Copy question ${question.questionNumber} as markdown`}
 												>
-													{copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "markdown" ? "Copied MD" : "Copy MD"}
+													{copiedQuestionStatus?.slot ===
+														question.slot &&
+													copiedQuestionStatus.mode ===
+														"markdown"
+														? "Copied MD"
+														: "Copy MD"}
 												</button>
 												<button
 													type="button"
 													onClick={() => {
-														void copyQuestionScreenshotToClipboard(question);
+														void copyQuestionScreenshotToClipboard(
+															question,
+														);
 													}}
 													data-copy-exclude="true"
 													class={`rounded-lg cursor-pointer border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "image" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
 													aria-label={`Copy question ${question.questionNumber} as image`}
 												>
-													{copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "image" ? "Copied IMG" : "Copy IMG"}
+													{copiedQuestionStatus?.slot ===
+														question.slot &&
+													copiedQuestionStatus.mode ===
+														"image"
+														? "Copied IMG"
+														: "Copy IMG"}
 												</button>
 											</div>
 										</div>
@@ -923,101 +1157,186 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 										<div class="p-3 space-y-3">
 											{question.questionHtml && (
 												<section class="rounded-xl border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
-													<div dangerouslySetInnerHTML={{ __html: question.questionHtml }} />
+													<div
+														dangerouslySetInnerHTML={{
+															__html: question.questionHtml,
+														}}
+													/>
 												</section>
 											)}
 
 											{question.answers.length > 0 && (
 												<section class="space-y-1.5">
-													<div class="text-[10px] font-semibold uppercase tracking-wide text-content-muted">Answers</div>
-													<div class="space-y-1.5">
-														{question.answers.map((answer, index) => (
-															<div
-																key={`${question.slot}-${index}`}
-																class={[
-																	"rounded-xl border-2 p-2.5 transition-colors",
-																	answer.selected
-																		? answer.incorrect
-																			? "border-danger bg-danger/10"
-																			: "border-primary bg-primary/10"
-																		: "border-edge bg-page-secondary",
-																].join(" ")}
+													<div class="text-[10px] flex items-center gap-2 font-semibold uppercase tracking-wide text-content-muted">
+														Answers
+														{studyModeActive && (
+															<button
+																class="rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+																onClick={() =>
+																	toogleRevealAnswer(
+																		question.slot,
+																	)
+																}
+																aria-label={`Reveal answer for question ${question.questionNumber}`}
 															>
-																<div class="flex items-start gap-2.5">
+																{isRevealed
+																	? "Hide"
+																	: "Reveal"}
+															</button>
+														)}
+													</div>
+													<div class="space-y-1.5">
+														{question.answers.map(
+															(answer, index) => {
+																const hideState =
+																	studyModeActive &&
+																	!isRevealed;
+
+																return (
 																	<div
+																		key={`${question.slot}-${index}`}
 																		class={[
-																			"mt-1 h-3 w-3 shrink-0 rounded-full border-2",
+																			"rounded-xl border-2 p-2.5 transition-colors",
+																			!hideState &&
 																			answer.selected
 																				? answer.incorrect
-																					? "border-danger bg-danger"
-																					: "border-primary bg-primary"
-																				: "border-edge bg-page",
-																			].join(" ")}
-																	/>
-																	<div class="flex-1 min-w-0 text-sm question-answer [&_p]:mb-2 [&_p:last-child]:mb-0 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_a]:text-primary [&_a]:underline">
-																		<div dangerouslySetInnerHTML={{ __html: answer.labelHtml }} />
+																					? "border-danger bg-danger/10"
+																					: "border-primary bg-primary/10"
+																				: "border-edge bg-page-secondary",
+																		].join(
+																			" ",
+																		)}
+																	>
+																		<div class="flex items-start gap-2.5">
+																			<div
+																				class={[
+																					"mt-1 h-3 w-3 shrink-0 rounded-full border-2",
+																					!hideState &&
+																					answer.selected
+																						? answer.incorrect
+																							? "border-danger bg-danger"
+																							: "border-primary bg-primary"
+																						: "border-edge bg-page",
+																				].join(
+																					" ",
+																				)}
+																			/>
+																			<div class="flex-1 min-w-0 text-sm question-answer [&_p]:mb-2 [&_p:last-child]:mb-0 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_a]:text-primary [&_a]:underline">
+																				<div
+																					dangerouslySetInnerHTML={{
+																						__html: answer.labelHtml,
+																					}}
+																				/>
+																			</div>
+																			{!hideState &&
+																				answer.selected && (
+																					<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-edge text-content-muted uppercase">
+																						Selected
+																					</span>
+																				)}
+																		</div>
 																	</div>
-																	{answer.selected && (
-																		<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-edge text-content-muted uppercase">Selected</span>
-																	)}
-																</div>
-															</div>
-														))}
+																);
+															},
+														)}
 													</div>
 												</section>
 											)}
 
-											{(question.feedbackHtml || question.rightAnswerHtml) && (
-												<section class="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
-													{question.feedbackHtml && (
-														<div class="rounded-xl border-2 border-edge bg-page-secondary p-3">
-															<div class="text-[10px] font-semibold uppercase tracking-wide text-content-muted mb-2">Feedback</div>
-															<div class="text-sm question-feedback [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: question.feedbackHtml }} />
-														</div>
-													)}
-													{question.rightAnswerHtml && (
-														<div class="rounded-xl border-2 border-primary/30 bg-primary/5 p-3">
-															<div class="text-[10px] font-semibold uppercase tracking-wide text-primary mb-2">Correct Answer</div>
-															<div class="text-sm question-correct [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: question.rightAnswerHtml }} />
-														</div>
-													)}
-												</section>
-											)}
+											{(question.feedbackHtml ||
+												question.rightAnswerHtml) &&
+												(!studyModeActive ||
+													isRevealed) && (
+													<section class="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+														{question.feedbackHtml && (
+															<div class="rounded-xl border-2 border-edge bg-page-secondary p-3">
+																<div class="text-[10px] font-semibold uppercase tracking-wide text-content-muted mb-2">
+																	Feedback
+																</div>
+																<div
+																	class="text-sm question-feedback [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline"
+																	dangerouslySetInnerHTML={{
+																		__html: question.feedbackHtml,
+																	}}
+																/>
+															</div>
+														)}
+														{question.rightAnswerHtml && (
+															<div class="rounded-xl border-2 border-primary/30 bg-primary/5 p-3">
+																<div class="text-[10px] font-semibold uppercase tracking-wide text-primary mb-2">
+																	Correct
+																	Answer
+																</div>
+																<div
+																	class="text-sm question-correct [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline"
+																	dangerouslySetInnerHTML={{
+																		__html: question.rightAnswerHtml,
+																	}}
+																/>
+															</div>
+														)}
+													</section>
+												)}
 
 											{!question.hasRenderedBlock && (
 												<details class="rounded-xl border-2 border-edge bg-page-secondary p-3">
-													<summary class="cursor-pointer text-sm font-semibold text-content">View HTML</summary>
-													<div class="mt-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-3 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: question.questionHtml || "" }} />
+													<summary class="cursor-pointer text-sm font-semibold text-content">
+														View HTML
+													</summary>
+													<div
+														class="mt-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-3 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline"
+														dangerouslySetInnerHTML={{
+															__html:
+																question.questionHtml ||
+																"",
+														}}
+													/>
 												</details>
 											)}
 
-											{showOneQuestionAtATime && activeQuestion && (
-												<div class="flex flex-wrap items-center justify-between gap-2 border-t-2 border-edge pt-3 print:hidden">
-													<div class="text-xs font-medium text-content-muted">
-														Showing question {activeQuestion.questionNumber} of {review.questionCount}
+											{showOneQuestionAtATime &&
+												activeQuestion && (
+													<div class="flex flex-wrap items-center justify-between gap-2 border-t-2 border-edge pt-3 print:hidden">
+														<div class="text-xs font-medium text-content-muted">
+															Showing question{" "}
+															{
+																activeQuestion.questionNumber
+															}{" "}
+															of{" "}
+															{
+																review.questionCount
+															}
+														</div>
+														<div class="flex items-center gap-2">
+															<button
+																type="button"
+																onClick={
+																	goToPreviousQuestion
+																}
+																disabled={
+																	!hasPreviousQuestion
+																}
+																data-copy-exclude="true"
+																class="rounded-lg border border-edge bg-page px-2 py-1 text-xs font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
+															>
+																Prev
+															</button>
+															<button
+																type="button"
+																onClick={
+																	goToNextQuestion
+																}
+																disabled={
+																	!hasNextQuestion
+																}
+																data-copy-exclude="true"
+																class="rounded-lg border border-edge bg-page px-2 py-1 text-xs font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
+															>
+																Next
+															</button>
+														</div>
 													</div>
-													<div class="flex items-center gap-2">
-														<button
-															type="button"
-															onClick={goToPreviousQuestion}
-															disabled={!hasPreviousQuestion}
-															data-copy-exclude="true"
-															class="rounded-lg border border-edge bg-page px-2 py-1 text-xs font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
-														>
-															Prev
-														</button>
-														<button
-															type="button"
-															onClick={goToNextQuestion}
-															disabled={!hasNextQuestion}
-															data-copy-exclude="true"
-															class="rounded-lg border border-edge bg-page px-2 py-1 text-xs font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
-														>
-															Next
-														</button>
-													</div>
-												</div>
-											)}
+												)}
 										</div>
 									</article>
 								);
@@ -1026,7 +1345,9 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 					</div>
 				</div>
 			) : (
-				<div class="rounded-xl border-2 border-edge bg-page-secondary p-4 text-sm text-content-muted">No questions were returned.</div>
+				<div class="rounded-xl border-2 border-edge bg-page-secondary p-4 text-sm text-content-muted">
+					No questions were returned.
+				</div>
 			)}
 		</div>
 	);
