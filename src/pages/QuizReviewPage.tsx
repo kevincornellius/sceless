@@ -2,209 +2,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { CheckCircle2, CircleHelp, XCircle } from "lucide-preact";
 import { toBlob as htmlToImageBlob } from "html-to-image";
 import { getAttemptReview } from "../data/adapter/moodlews/quiz";
-
-interface QuizReviewPageProps {
-	attemptId: string;
-}
-
-interface RawQuestion {
-	slot: number;
-	type: string;
-	page: number;
-	html: string;
-	status?: string;
-	state?: string;
-	mark?: string;
-	maxmark?: number;
-	number?: number;
-	flagged?: boolean;
-}
-
-interface QuizReviewPayload {
-	grade?: string | number;
-	attempt?: Record<string, unknown>;
-	additionaldata?: Array<Record<string, unknown>>;
-	questions?: RawQuestion[];
-}
-
-interface ParsedAnswer {
-	labelHtml: string;
-	selected: boolean;
-	incorrect: boolean;
-	correct: boolean;
-}
-
-type QuestionVerdict = "correct" | "incorrect" | "partial" | "unknown";
-
-interface ParsedQuestion {
-	slot: number;
-	type: string;
-	page: number;
-	questionNumber: string;
-	state: string;
-	verdict: QuestionVerdict;
-	verdictLabel: string;
-	grade: string;
-	flagged: boolean;
-	questionHtml: string;
-	answers: ParsedAnswer[];
-	feedbackHtml: string;
-	rightAnswerHtml: string;
-	hasRenderedBlock: boolean;
-}
-
-interface ParsedReview {
-	grade: string;
-	attemptLabel: string;
-	state: string;
-	questionCount: number;
-	timestart: number | null;
-	timefinish: number | null;
-	sumgrades: number | string;
-	questions: ParsedQuestion[];
-}
-
-function getHtml(container: Element, selector: string): string {
-	return container.querySelector(selector)?.innerHTML?.trim() ?? "";
-}
-
-function getText(container: Element, selector: string): string {
-	return container.querySelector(selector)?.textContent?.trim() ?? "";
-}
-
-function htmlFragmentToMarkdown(fragmentHtml: string): string {
-	const container = document.createElement("div");
-	container.innerHTML = fragmentHtml || "";
-	container.querySelectorAll("script").forEach((node) => node.remove());
-
-	container.querySelectorAll("img").forEach((image) => {
-		const source = image.getAttribute("src") || "";
-		if (!source) {
-			image.remove();
-			return;
-		}
-
-		const alt = image.getAttribute("alt") || "image";
-		const absoluteSource = new URL(source, window.location.href).href;
-		image.replaceWith(document.createTextNode(`![${alt}](${absoluteSource})`));
-	});
-
-	container.querySelectorAll("br").forEach((node) => node.replaceWith("\n"));
-
-	return container.innerText.trim();
-}
-
-function collectImageSources(...htmlFragments: string[]): string[] {
-	const sources = new Set<string>();
-
-	for (const fragment of htmlFragments) {
-		const container = document.createElement("div");
-		container.innerHTML = fragment || "";
-		container.querySelectorAll("script").forEach((node) => node.remove());
-
-		container.querySelectorAll("img").forEach((image) => {
-			const source = image.getAttribute("src");
-			if (!source) {
-				return;
-			}
-
-			sources.add(new URL(source, window.location.href).href);
-		});
-	}
-
-	return Array.from(sources);
-}
-
-type CopyMode = "markdown" | "image";
-
-interface CopyStatus {
-	slot: number;
-	mode: CopyMode;
-}
-
-function buildQuestionMarkdown(question: ParsedQuestion): string {
-	const parts: string[] = [];
-	parts.push(`# Question ${question.questionNumber}`);
-	parts.push(`**Type:** ${question.type}`);
-	if (question.state) {
-		parts.push(`**State:** ${question.state}`);
-	}
-	if (question.grade) {
-		parts.push(`**Grade:** ${question.grade}`);
-	}
-	parts.push("");
-
-	if (question.questionHtml) {
-		parts.push(htmlFragmentToMarkdown(question.questionHtml));
-		parts.push("");
-	}
-
-	if (question.answers.length > 0) {
-		parts.push("## Options");
-		question.answers.forEach((answer, index) => {
-			const optionText = htmlFragmentToMarkdown(answer.labelHtml);
-			const optionState = answer.selected ? (answer.incorrect ? " (selected, incorrect)" : " (selected)") : answer.correct ? " (correct)" : "";
-			parts.push(`${index + 1}. ${optionText}${optionState}`);
-		});
-		parts.push("");
-	}
-
-	if (question.feedbackHtml) {
-		parts.push("## Feedback");
-		parts.push(htmlFragmentToMarkdown(question.feedbackHtml));
-		parts.push("");
-	}
-
-	if (question.rightAnswerHtml) {
-		parts.push("## Correct Answer");
-		parts.push(htmlFragmentToMarkdown(question.rightAnswerHtml));
-		parts.push("");
-	}
-
-	return parts.join("\n").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-async function blobToPng(blob: Blob): Promise<Blob> {
-	if (blob.type === "image/png") {
-		return blob;
-	}
-
-	try {
-		const bitmap = await createImageBitmap(blob);
-		const canvas = document.createElement("canvas");
-		canvas.width = bitmap.width;
-		canvas.height = bitmap.height;
-
-		const context = canvas.getContext("2d");
-		if (!context) {
-			return blob;
-		}
-
-		context.drawImage(bitmap, 0, 0);
-		bitmap.close();
-
-		const pngBlob = await new Promise<Blob | null>((resolve) => {
-			canvas.toBlob((result) => resolve(result), "image/png");
-		});
-
-		return pngBlob ?? blob;
-	} catch {
-		return blob;
-	}
-}
-
-async function fetchImageBlob(imageUrl: string): Promise<Blob | null> {
-	try {
-		const response = await fetch(imageUrl);
-		if (!response.ok) {
-			return null;
-		}
-
-		return response.blob();
-	} catch {
-		return null;
-	}
-}
+import type { QuizReviewPageProps, QuizReviewPayload, ParsedQuestion, ParsedReview, QuestionVerdict, RawQuestion, ParsedAnswer} from "../types/quizReview";
+import { blobToPng, getHtml, getText, buildQuestionMarkdown, fetchImageBlob, collectImageSources, CopyStatus } from "../helper/quizReview";
 
 function formatUnixTime(value: number | null): string {
 	if (value === null || Number.isNaN(value)) {
@@ -515,6 +314,370 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 		selectQuestion(nextQuestion.slot);
 	};
 
+	const exportQuizToPdf = () => {
+		if (!review) {
+			return;
+		}
+
+		const iframe = document.createElement("iframe");
+		iframe.setAttribute("aria-hidden", "true");
+		iframe.tabIndex = -1;
+		iframe.style.position = "fixed";
+		iframe.style.left = "0";
+		iframe.style.top = "0";
+		iframe.style.width = "0";
+		iframe.style.height = "0";
+		iframe.style.opacity = "0";
+		iframe.style.border = "0";
+		iframe.style.pointerEvents = "none";
+		document.body.appendChild(iframe);
+
+		const cleanup = () => {
+			iframe.remove();
+		};
+
+		const escapeHtml = (value: string) =>
+			value
+				.replaceAll("&", "&amp;")
+				.replaceAll("<", "&lt;")
+				.replaceAll(">", "&gt;")
+				.replaceAll('"', "&quot;")
+				.replaceAll("'", "&#39;");
+
+		const buildQuestionPrintHtml = (question: ParsedQuestion) => {
+			const answerItems = question.answers
+				.map((answer) => {
+					const answerClass = answer.selected ? (answer.incorrect ? "answer answer-incorrect" : "answer answer-selected") : "answer";
+					const answerHtml = answer.labelHtml.trim();
+
+
+					return `<div class="${answerClass}"><div class="answer-bullet"></div><div class="answer-body">${answerHtml}</div></div>`;
+				})
+				.join("");
+
+			const feedbackHtml = question.feedbackHtml ? `<section class="panel panel-muted"><div class="section-title">Feedback</div><div class="richtext">${question.feedbackHtml}</div></section>` : "";
+			const rightAnswerHtml = question.rightAnswerHtml ? `<section class="panel panel-correct"><div class="section-title">Correct Answer</div><div class="richtext">${question.rightAnswerHtml}</div></section>` : "";
+
+			return `
+				<article class="question-card">
+					<header class="question-head">
+						<div class="question-meta">
+							<span class="question-pill">Q${escapeHtml(question.questionNumber)}</span>
+							<span class="question-type">${escapeHtml(question.type)}</span>
+							${question.state ? `<span class="question-state">${escapeHtml(question.state)}</span>` : ""}
+						</div>
+						<div class="question-meta">
+							${question.grade ? `<span class="question-grade">${escapeHtml(question.grade)}</span>` : ""}
+							<span class="question-verdict ${escapeHtml(question.verdict)}">${escapeHtml(question.verdictLabel)}</span>
+						</div>
+					</header>
+					<div class="question-body">
+						${question.questionHtml ? `<section class="panel"><div class="richtext">${question.questionHtml}</div></section>` : ""}
+						${answerItems ? `<section class="answers">${answerItems}</section>` : ""}
+						${feedbackHtml}
+						${rightAnswerHtml}
+					</div>
+				</article>
+			`;
+		};
+
+		const printHtml = review.questions.map(buildQuestionPrintHtml).join("");
+		const documentTitle = `Quiz Review ${attemptId}`;
+		const summaryHeader = `
+			<header class="document-header">
+				<div>
+					<div class="eyebrow">Quiz Review</div>
+					<h1>${escapeHtml(documentTitle)}</h1>
+					<p>Rendered with sceless.</p>
+				</div>
+				<div class="summary-grid">
+					<div class="summary-card">
+						<span>Attempt</span>
+						<strong>${escapeHtml(review.attemptLabel)}</strong>
+					</div>
+					<div class="summary-card">
+						<span>Grade</span>
+						<strong>${escapeHtml(review.grade)}</strong>
+					</div>
+					<div class="summary-card">
+						<span>Questions</span>
+						<strong>${escapeHtml(String(review.questionCount))}</strong>
+					</div>
+					<div class="summary-card">
+						<span>Sum Grades</span>
+						<strong>${escapeHtml(String(review.sumgrades))}</strong>
+					</div>
+					<div class="summary-card">
+						<span>Time Start</span>
+						<strong>${escapeHtml(formatUnixTime(review.timestart))}</strong>
+					</div>
+					<div class="summary-card">
+						<span>Time Finish</span>
+						<strong>${escapeHtml(formatUnixTime(review.timefinish))}</strong>
+					</div>
+				</div>
+			</header>
+		`;
+		const html = `<!doctype html>
+		<html>
+		<head>
+			<meta charset="utf-8" />
+			<meta name="viewport" content="width=device-width, initial-scale=1" />
+			<title>${escapeHtml(documentTitle)}</title>
+			<style>
+				@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+				:root {
+					color-scheme: light;
+					--bg: #f5efe5;
+					--page: #fffdf8;
+					--page-secondary: #f4ead8;
+					--page-accent: #eef4ff;
+					--edge: #d9c9b0;
+					--content: #1f2937;
+					--content-muted: #6b7280;
+					--primary: #2153d3;
+					--primary-strong: #1238a8;
+					--danger: #c2410c;
+					--success: #0f766e;
+					--shadow: 0 18px 50px rgba(31, 41, 55, 0.09);
+				}
+				* { box-sizing: border-box; }
+				body {
+					margin: 0;
+					padding: 10px;
+					background: var(--bg);
+					color: var(--content);
+					font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+					-webkit-font-smoothing: antialiased;
+					text-rendering: optimizeLegibility;
+				}
+				.document-header {
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) minmax(210px, 320px);
+					gap: 8px;
+					align-items: start;
+					padding: 9px 10px 8px;
+					margin-bottom: 8px;
+					background: linear-gradient(135deg, rgba(33, 83, 211, 0.08), rgba(245, 239, 229, 0.94));
+					border: 1px solid color-mix(in srgb, var(--primary) 22%, white);
+					border-radius: 14px;
+				}
+				.eyebrow {
+					display: inline-flex;
+					align-items: center;
+					padding: 3px 7px;
+					border-radius: 999px;
+					background: color-mix(in srgb, var(--primary) 14%, white);
+					color: var(--primary-strong);
+					font-size: 9px;
+					font-weight: 800;
+					letter-spacing: 0.08em;
+					text-transform: uppercase;
+					margin-bottom: 6px;
+				}
+				.document-header h1 {
+					margin: 0;
+					font-size: 18px;
+					line-height: 1.1;
+					letter-spacing: -0.02em;
+				}
+				.document-header p {
+					margin: 5px 0 0;
+					max-width: 56ch;
+					color: var(--content-muted);
+					font-size: 10px;
+					line-height: 1.4;
+				}
+				.summary-grid {
+					display: grid;
+					grid-template-columns: repeat(2, minmax(0, 1fr));
+					gap: 6px;
+				}
+				.summary-card {
+					padding: 3px 4px;
+					border-radius: 10px;
+					border: 1px solid color-mix(in srgb, var(--primary) 18%, white);
+					background: rgba(255, 255, 255, 0.8);
+				}
+				.summary-card span {
+					display: block;
+					font-size: 7px;
+					font-weight: 800;
+					text-transform: uppercase;
+					letter-spacing: 0.08em;
+					color: var(--content-muted);
+					margin-bottom: 3px;
+				}
+				.summary-card strong {
+					display: block;
+					font-size: 10px;
+					line-height: 1.2;
+					color: var(--content);
+				}
+				.questions {
+					display: flex;
+					flex-direction: column;
+					gap: 8px;
+				}
+				.question-card {
+					background: var(--page);
+					border: 1px solid color-mix(in srgb, var(--edge) 88%, white);
+					border-radius: 12px;
+					overflow: hidden;
+					break-inside: avoid;
+					page-break-inside: avoid;
+				}
+				.question-head {
+					display: flex;
+					justify-content: space-between;
+					gap: 12px;
+					padding: 3px 6px;
+					background: var(--page-secondary);
+					border-bottom: 1px solid color-mix(in srgb, var(--edge) 88%, white);
+					flex-wrap: wrap;
+				}
+				.question-meta {
+					display: flex;
+					gap: 4px;
+					align-items: center;
+					flex-wrap: wrap;
+				}
+				.question-pill,
+				.question-state,
+				.question-grade,
+				.question-verdict,
+				.question-type {
+					display: inline-flex;
+					align-items: center;
+					border-radius: 999px;
+					padding: 3px 6px;
+					font-size: 8px;
+					font-weight: 700;
+					line-height: 1;
+					box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+				}
+				.question-pill { background: var(--primary); color: white; }
+				.question-type { background: #e7ebf0; color: var(--content); }
+				.question-state { background: #e7ebf0; color: var(--content-muted); }
+				.question-grade { background: color-mix(in srgb, var(--primary) 18%, white); color: var(--primary-strong); }
+				.question-verdict.correct { background: color-mix(in srgb, var(--primary) 18%, white); color: var(--primary-strong); }
+				.question-verdict.incorrect { background: color-mix(in srgb, var(--danger) 18%, white); color: var(--danger); }
+				.question-verdict.partial,
+				.question-verdict.unknown { background: #e7ebf0; color: var(--content-muted); }
+				.question-body { padding: 10px; display: grid; gap: 8px; }
+				.panel {
+					border: 1px solid color-mix(in srgb, var(--edge) 88%, white);
+					border-radius: 10px;
+					background: var(--page-secondary);
+					padding: 9px;
+				}
+				.panel-muted { background: #fafbfc; }
+				.panel-correct { background: color-mix(in srgb, var(--primary) 6%, white); border-color: color-mix(in srgb, var(--primary) 28%, white); }
+				.section-title { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--content-muted); margin-bottom: 5px; }
+				.answers { display: grid; gap: 6px; }
+				.answer {
+					display: flex;
+					gap: 5px;
+					align-items: flex-start;
+					padding: 4px 6px;
+					border-radius: 8px;
+					border: 1px solid color-mix(in srgb, var(--edge) 88%, white);
+					background: var(--page-secondary);
+				}
+				.answer-selected { border-color: color-mix(in srgb, var(--primary) 38%, white); background: color-mix(in srgb, var(--primary) 8%, white); }
+				.answer-incorrect { border-color: color-mix(in srgb, var(--danger) 38%, white); background: color-mix(in srgb, var(--danger) 8%, white); }
+				.answer-bullet {
+					width: 8px;
+					height: 8px;
+					border-radius: 999px;
+					margin-top: 3px;
+					border: 2px solid color-mix(in srgb, var(--edge) 85%, white);
+					background: white;
+					flex: none;
+				}
+				.answer-selected .answer-bullet { border-color: var(--primary); background: var(--primary); }
+				.answer-incorrect .answer-bullet { border-color: var(--danger); background: var(--danger); }
+				.answer-body, .richtext { font-size: 12px; line-height: 1.35; }
+				.answer-body > :first-child { margin-top: 0 !important; }
+				.answer-body > :last-child { margin-bottom: 0 !important; }
+				.answer-body .answernumber {
+					display: inline;
+					margin-right: 0.2rem;
+				}
+				.answer-body .flex-fill {
+					display: inline-block;
+					vertical-align: top;
+					min-width: 0;
+				}
+				.answer-body .flex-fill > :first-child { margin-top: 0 !important; }
+				.answer-body .flex-fill > :last-child { margin-bottom: 0 !important; }
+				.answer-body .flex-fill p { display: inline; margin: 0; }
+				.answer-body p { margin: 0 0 0.35em; }
+				.answer-body img,
+				.richtext img {
+					max-width: 58%;
+					max-height: none;
+					width: auto;
+					height: auto;
+					display: block;
+				}
+				.richtext p { margin: 0 0 0.5em; }
+				.richtext p:last-child { margin-bottom: 0; }
+				.richtext table { border-collapse: collapse; }
+				.richtext td, .richtext th { border: 1px solid var(--edge); padding: 4px 6px; }
+				.richtext a { color: var(--primary); }
+				.richtext ul, .richtext ol { padding-left: 1rem; margin: 0.15rem 0 0.45rem; }
+				.richtext li { margin-bottom: 0.15rem; }
+				@page { margin: 8mm; }
+				@media print {
+					body { background: white; padding: 0; }
+					.question-card { break-inside: avoid; page-break-inside: avoid; }
+				}
+			</style>
+		</head>
+		<body>
+			${summaryHeader}
+			<div class="questions">${printHtml}</div>
+		</body>
+		</html>`;
+
+		iframe.addEventListener("load", () => {
+			const frameWindow = iframe.contentWindow;
+			const frameDocument = iframe.contentDocument;
+
+			if (!frameWindow || !frameDocument) {
+				cleanup();
+				return;
+			}
+
+			const waitForImages = Array.from(frameDocument.images).map((image) => {
+				if (image.complete) {
+					return Promise.resolve();
+				}
+
+				return new Promise<void>((resolve) => {
+					image.addEventListener("load", () => resolve(), { once: true });
+					image.addEventListener("error", () => resolve(), { once: true });
+				});
+			});
+
+			const handleAfterPrint = () => {
+				frameWindow.removeEventListener("afterprint", handleAfterPrint);
+				cleanup();
+			};
+
+			frameWindow.addEventListener("afterprint", handleAfterPrint);
+			Promise.all(waitForImages).then(() => {
+				frameWindow.focus();
+				frameWindow.print();
+				window.setTimeout(cleanup, 1000);
+			});
+		}, { once: true });
+
+		iframe.srcdoc = html;
+	};
+
 	const copyQuestionMarkdownToClipboard = async (question: ParsedQuestion) => {
 		const markdown = buildQuestionMarkdown(question);
 		const imageSources = collectImageSources(question.questionHtml, ...question.answers.map((answer) => answer.labelHtml), question.feedbackHtml, question.rightAnswerHtml);
@@ -595,11 +758,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			console.error("Failed to copy question screenshot", copyError);
 		}
 	};
-	const questionsToRender = review
-		? showOneQuestionAtATime && activeQuestion
-			? [activeQuestion]
-			: review.questions
-		: [];
+	const questionsToRender = review ? (showOneQuestionAtATime && activeQuestion ? [activeQuestion] : review.questions) : [];
 
 	return (
 		<div ref={pageContainerRef} class="p-4 lg:p-6 h-full overflow-y-auto">
@@ -623,7 +782,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				<div class="rounded-xl border-2 border-danger bg-danger/10 p-4 text-sm text-danger">{error}</div>
 			) : review ? (
 				<div class="grid grid-cols-1 xl:grid-cols-[220px_minmax(0,1fr)] gap-4 items-start">
-					<div class="space-y-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto">
+					<div class="space-y-3 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:overflow-y-auto print:hidden">
 						
                         <aside class="rounded-2xl border-2 border-edge bg-page-secondary p-3 flex-1 min-h-0">
 						<div class="flex items-center justify-between gap-2 mb-3">
@@ -665,7 +824,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 						</aside>
                         <aside class="rounded-2xl border-2 border-edge bg-page-secondary p-3">
 						<div class="mb-3 flex items-center justify-between gap-2">
-							<div class="text-sm font-semibold text-content">Questions</div>
+							<div class="text-sm font-semibold text-content">Review</div>
 							<button
 								type="button"
 								onClick={() => setShowOneQuestionAtATime((current) => !current)}
@@ -675,6 +834,14 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 								One at a time
 							</button>
 						</div>
+
+						<button
+							type="button"
+							onClick={exportQuizToPdf}
+							class="mb-3 w-full rounded-xl border-2 border-primary bg-primary/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/15 print:hidden"
+						>
+							EXPORT QUIZ TO PDF
+						</button>
 
 						<div class="grid grid-cols-2 gap-1.5">
 							<div class="rounded-xl border border-edge bg-page p-2 min-h-12 flex flex-col justify-between gap-0.5">
@@ -719,25 +886,22 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 												<span class={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-primary text-on-primary uppercase ${question.flagged ? "border-r-4 border-r-amber-400" : ""}`}>
 													Q{question.questionNumber}
 												</span>
-												<span class="text-sm font-semibold text-content capitalize">{question.type}</span>
-												{question.state && (
-													<span class="text-[10px] font-semibold px-2 py-1 rounded-lg bg-edge text-content-muted">{question.state}</span>
-												)}
-											</div>
-											<div class="flex items-center gap-2">
 												{question.grade && (
 													<span class="text-[10px] font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">{question.grade}</span>
 												)}
 												<span class={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wide ${verdictStyles.badge}`}>
 													{question.verdictLabel}
 												</span>
+											</div>
+											<div class="flex items-center gap-2 print:hidden">
+												
 												<button
 													type="button"
 													onClick={() => {
 														void copyQuestionMarkdownToClipboard(question);
 													}}
 													data-copy-exclude="true"
-													class={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "markdown" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
+													class={`rounded-lg cursor-pointer border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "markdown" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
 													aria-label={`Copy question ${question.questionNumber} as markdown`}
 												>
 													{copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "markdown" ? "Copied MD" : "Copy MD"}
@@ -748,7 +912,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 														void copyQuestionScreenshotToClipboard(question);
 													}}
 													data-copy-exclude="true"
-													class={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "image" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
+													class={`rounded-lg cursor-pointer border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "image" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
 													aria-label={`Copy question ${question.questionNumber} as image`}
 												>
 													{copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "image" ? "Copied IMG" : "Copy IMG"}
@@ -828,7 +992,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 											)}
 
 											{showOneQuestionAtATime && activeQuestion && (
-												<div class="flex flex-wrap items-center justify-between gap-2 border-t-2 border-edge pt-3">
+												<div class="flex flex-wrap items-center justify-between gap-2 border-t-2 border-edge pt-3 print:hidden">
 													<div class="text-xs font-medium text-content-muted">
 														Showing question {activeQuestion.questionNumber} of {review.questionCount}
 													</div>
