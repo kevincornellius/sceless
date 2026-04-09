@@ -1358,7 +1358,6 @@ export async function mountQuizReviewNative({
 	);
 
 	brandLink.append(brandLogoMount);
-	topActions.append(brandLink);
 
 	const controls = document.createElement("div");
 	controls.className = "sceless-native-controls";
@@ -1436,8 +1435,9 @@ export async function mountQuizReviewNative({
 
 		themeLabel.append(themeText, themeSelect);
 		topActions.append(themeLabel);
+		
 	}
-
+	topActions.append(brandLink);
 	topBar.append(titleBlock, topActions);
 
 	const navigation = document.createElement("div");
@@ -1524,8 +1524,9 @@ export async function mountQuizReviewNative({
 		summaryCard.className = "sceless-native-aside-card sceless-native-summary-card";
 		const summaryHeading = document.createElement("h2");
 		summaryHeading.className = "sceless-native-aside-heading";
-		summaryHeading.textContent = "Attempt Summary";
+		summaryHeading.textContent = `Attempt Summary - ${pageTitle}`;
 		summaryCard.append(summaryHeading, summaryTable);
+	
 		summaryPanel.append(summaryCard);
 	}
 

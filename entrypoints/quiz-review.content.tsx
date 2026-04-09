@@ -1,5 +1,3 @@
-import { render } from "preact";
-import QuizReviewPage from "@/src/pages/QuizReviewPage";
 import tailwindCss from "@/src/assets/tailwind.css?inline";
 import { quizReviewHijackStorage } from "@/src/storage";
 import { initializeTheme } from "@/src/stores/theme";
@@ -71,10 +69,7 @@ function ensureStyles() {
 		justify-content: center;
 		height: 34px;
 		padding: 0 9px;
-		border: 1px solid var(--theme-edge, #e5e5e5);
-		border-radius: 10px;
-		background: var(--theme-page-secondary, #f7f7f7);
-		color: var(--theme-content, #3c3c3c);
+		color: var(--theme-primary, #58cc02);
 		text-decoration: none;
 	}
 
@@ -95,9 +90,10 @@ function ensureStyles() {
 
 	#${ROOT_ID} .sceless-native-title h1 {
 		margin: 0;
-		font-size: 22px;
+		font-size: 28px;
+		font-weight: 900;
 		line-height: 1.2;
-		color: var(--theme-content, #3c3c3c);
+		color: var(--theme-primary, #3c3c3c);
 	}
 
 	#${ROOT_ID} .sceless-native-title p {
@@ -228,10 +224,9 @@ function ensureStyles() {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		border: 1px solid color-mix(in srgb, var(--theme-primary, #58cc02) 30%, var(--theme-page, #ffffff));
 		border-radius: 10px;
-		background: color-mix(in srgb, var(--theme-primary, #58cc02) 12%, var(--theme-page, #ffffff));
-		color: var(--theme-primary, #58cc02);
+		background: color-mix(in srgb, var(--theme-primary, #58cc02) 100%, var(--theme-page, #ffffff));
+		color: var(--theme-on-primary, #ffffff);
 		padding: 7px 10px;
 		font-size: 11px;
 		font-weight: 800;
@@ -588,13 +583,12 @@ function ensureStyles() {
 		align-items: center;
 		padding: 5px 9px;
 		border-radius: 999px;
-		border: 1px solid color-mix(in srgb, var(--theme-primary, #58cc02) 36%, var(--theme-page, #ffffff));
-		background: color-mix(in srgb, var(--theme-primary, #58cc02) 10%, var(--theme-page, #ffffff));
+		background: color-mix(in srgb, var(--theme-primary, #58cc02) 100%, var(--theme-page, #ffffff));
 		font-size: 10px;
 		font-weight: 800;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
-		color: var(--theme-primary, #58cc02);
+		color: var(--theme-on-primary, #ffffff);
 	}
 
 	#${ROOT_ID} .sceless-native-question-title-number {
@@ -605,9 +599,8 @@ function ensureStyles() {
 		height: 26px;
 		padding: 0 8px;
 		border-radius: 999px;
-		background: color-mix(in srgb, var(--theme-primary, #58cc02) 14%, var(--theme-page, #ffffff));
-		border: 1px solid color-mix(in srgb, var(--theme-primary, #58cc02) 46%, var(--theme-edge, #e5e5e5));
-		color: var(--theme-primary, #58cc02);
+		background: color-mix(in srgb, var(--theme-primary, #58cc02) 100%, var(--theme-page, #ffffff));
+		color: var(--theme-on-primary, #ffffff);
 		font-size: 12px;
 		font-weight: 900;
 		white-space: nowrap;
@@ -890,15 +883,14 @@ function ensureStyles() {
 
 	#${ROOT_ID} .sceless-native-tool-button {
 		appearance: none;
-		border: 1px solid color-mix(in srgb, var(--theme-primary, #58cc02) 30%, var(--theme-page, #ffffff));
 		border-radius: 9px;
 		padding: 4px 8px;
 		font-size: 10px;
 		font-weight: 800;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
-		background: color-mix(in srgb, var(--theme-primary, #58cc02) 10%, var(--theme-page, #ffffff));
-		color: var(--theme-primary, #58cc02);
+		background: color-mix(in srgb, var(--theme-primary, #58cc02) 100%, var(--theme-page, #ffffff));
+		color: var(--theme-on-primary, #ffffff);
 		cursor: pointer;
 	}
 
@@ -1071,18 +1063,6 @@ export default defineContentScript({
 				return;
 			}
 
-			render(
-				<div class="min-h-screen bg-page-secondary text-content">
-					<div class="mx-auto max-w-400 h-screen">
-						<QuizReviewPage
-							attemptId={attemptId}
-							initialPayload={payload}
-							showThemeSelector
-						/>
-					</div>
-				</div>,
-				root,
-			);
 		};
 
 		if (document.readyState === "loading") {
