@@ -48,6 +48,57 @@
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
+/* Prevent host-site utility classes (e.g. Bootstrap .bg-primary) from overriding extension theme colors */
+#sceless-root .bg-primary,
+#sceless-quiz-review-root .bg-primary {
+  background-color: var(--theme-primary) !important;
+}
+
+#sceless-root .text-primary,
+#sceless-quiz-review-root .text-primary {
+  color: var(--theme-primary) !important;
+}
+
+#sceless-root .border-primary,
+#sceless-quiz-review-root .border-primary {
+  border-color: var(--theme-primary) !important;
+}
+
+#sceless-root .text-on-primary,
+#sceless-quiz-review-root .text-on-primary {
+  color: var(--theme-on-primary) !important;
+}
+
+#sceless-root .bg-danger,
+#sceless-quiz-review-root .bg-danger {
+  background-color: var(--theme-danger) !important;
+}
+
+#sceless-root .text-danger,
+#sceless-quiz-review-root .text-danger {
+  color: var(--theme-danger) !important;
+}
+
+#sceless-root .border-danger,
+#sceless-quiz-review-root .border-danger {
+  border-color: var(--theme-danger) !important;
+}
+
+#sceless-root .bg-success,
+#sceless-quiz-review-root .bg-success {
+  background-color: var(--theme-success) !important;
+}
+
+#sceless-root .text-success,
+#sceless-quiz-review-root .text-success {
+  color: var(--theme-success) !important;
+}
+
+#sceless-root .border-success,
+#sceless-quiz-review-root .border-success {
+  border-color: var(--theme-success) !important;
+}
+
 /* Moodle/SCELE uses no-overflow to clip content */
 .no-overflow {
   overflow: hidden;

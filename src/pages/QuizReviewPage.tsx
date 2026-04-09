@@ -1153,6 +1153,7 @@ export default function QuizReviewPage({
 
 		const printHtml = review.questions.map(buildQuestionPrintHtml).join("");
 		const documentTitle = `${review.displayTitle || "Quiz Review"}`;
+		const activeTheme = theme.value;
 		const summaryHeader = `
 			<header class="document-header">
 				<div>
@@ -1199,17 +1200,18 @@ export default function QuizReviewPage({
 
 				:root {
 					color-scheme: light;
-					--bg: #f5efe5;
-					--page: #fffdf8;
-					--page-secondary: #f4ead8;
-					--page-accent: #eef4ff;
-					--edge: #d9c9b0;
-					--content: #1f2937;
-					--content-muted: #6b7280;
-					--primary: #2153d3;
-					--primary-strong: #1238a8;
-					--danger: #c2410c;
-					--success: #0f766e;
+					--bg: ${activeTheme.bg};
+					--page: ${activeTheme.bg};
+					--page-secondary: ${activeTheme.bgSecondary};
+					--page-accent: ${activeTheme.highlight};
+					--edge: ${activeTheme.border};
+					--content: ${activeTheme.text};
+					--content-muted: ${activeTheme.textMuted};
+					--primary: ${activeTheme.primary};
+					--primary-strong: ${activeTheme.primaryDark};
+					--on-primary: ${activeTheme.onPrimary};
+					--danger: ${activeTheme.danger};
+					--success: ${activeTheme.success};
 				}
 				* { box-sizing: border-box; }
 				body {
@@ -1228,7 +1230,11 @@ export default function QuizReviewPage({
 					align-items: start;
 					padding: 9px 10px 8px;
 					margin-bottom: 8px;
-					background: linear-gradient(135deg, rgba(33, 83, 211, 0.08), rgba(245, 239, 229, 0.94));
+					background: linear-gradient(
+						135deg,
+						color-mix(in srgb, var(--primary) 12%, var(--page)),
+						color-mix(in srgb, var(--page-secondary) 88%, var(--page))
+					);
 					border: 1px solid color-mix(in srgb, var(--primary) 22%, white);
 					border-radius: 14px;
 				}
@@ -1293,7 +1299,7 @@ export default function QuizReviewPage({
 					padding: 3px 4px;
 					border-radius: 10px;
 					border: 1px solid color-mix(in srgb, var(--primary) 18%, white);
-					background: rgba(255, 255, 255, 0.8);
+					background: color-mix(in srgb, var(--page) 88%, var(--primary) 12%);
 				}
 				.summary-card span {
 					display: block;
@@ -1351,14 +1357,14 @@ export default function QuizReviewPage({
 					font-weight: 700;
 					line-height: 1;
 				}
-				.question-pill { background: var(--primary); color: white; }
-				.question-type { background: #e7ebf0; color: var(--content); }
-				.question-state { background: #e7ebf0; color: var(--content-muted); }
+				.question-pill { background: var(--primary); color: var(--on-primary); }
+				.question-type { background: color-mix(in srgb, var(--edge) 38%, var(--page)); color: var(--content); }
+				.question-state { background: color-mix(in srgb, var(--edge) 38%, var(--page)); color: var(--content-muted); }
 				.question-grade { background: color-mix(in srgb, var(--primary) 18%, white); color: var(--primary-strong); }
 				.question-verdict.correct { background: color-mix(in srgb, var(--primary) 18%, white); color: var(--primary-strong); }
 				.question-verdict.incorrect { background: color-mix(in srgb, var(--danger) 18%, white); color: var(--danger); }
 				.question-verdict.partial,
-				.question-verdict.unknown { background: #e7ebf0; color: var(--content-muted); }
+				.question-verdict.unknown { background: color-mix(in srgb, var(--edge) 38%, var(--page)); color: var(--content-muted); }
 				.question-body { padding: 10px; display: grid; gap: 8px; }
 				.panel {
 					/* border intentionally omitted for cleaner print cards */
@@ -1366,7 +1372,7 @@ export default function QuizReviewPage({
 					background: var(--page-secondary);
 					padding: 9px;
 				}
-				.panel-muted { background: #fafbfc; }
+				.panel-muted { background: color-mix(in srgb, var(--page-secondary) 88%, var(--page)); }
 				.panel-correct { background: color-mix(in srgb, var(--primary) 6%, white); border-color: color-mix(in srgb, var(--primary) 28%, white); }
 				.section-title { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--content-muted); margin-bottom: 5px; }
 				.answers { display: grid; gap: 6px; }
@@ -1774,7 +1780,7 @@ export default function QuizReviewPage({
 											)
 										}
 										aria-pressed={showOneQuestionAtATime}
-										class={`rounded-xl! border px-3 py-2 text-xs font-semibold transition-all ${showOneQuestionAtATime ? "border-primary bg-primary text-on-primary" : "border-edge bg-page text-content-muted hover:border-primary/40 hover:text-content"}`}
+													class={`rounded-xl! border px-2.5 py-1.5 text-[11px] font-semibold transition-all ${showOneQuestionAtATime ? "border-primary bg-primary text-on-primary" : "border-edge bg-page text-content-muted hover:border-primary/40 hover:text-content"}`}
 									>
 										One-at-a-time
 									</button>
@@ -1784,7 +1790,7 @@ export default function QuizReviewPage({
 											setStudyModeActive((current) => !current)
 										}
 										aria-pressed={studyModeActive}
-										class={`rounded-xl! border px-3 py-2 text-xs font-semibold transition-all ${studyModeActive ? "border-primary bg-primary text-on-primary" : "border-edge bg-page text-content-muted hover:border-primary/40 hover:text-content"}`}
+													class={`rounded-xl! border px-2.5 py-1.5 text-[11px] font-semibold transition-all ${studyModeActive ? "border-primary bg-primary text-on-primary" : "border-edge bg-page text-content-muted hover:border-primary/40 hover:text-content"}`}
 									>
 										Study Mode
 									</button>
@@ -1794,7 +1800,7 @@ export default function QuizReviewPage({
 							<button
 								type="button"
 								onClick={exportQuizToPdf}
-								class="mb-3 w-full rounded-xl! border-2 border-primary bg-primary/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/15 print:hidden"
+								class="mb-3 w-full rounded-xl! border-2 border-primary bg-primary/15 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/20 print:hidden"
 							>
 								EXPORT QUIZ TO PDF
 							</button>
@@ -1934,7 +1940,7 @@ export default function QuizReviewPage({
 														);
 													}}
 													data-copy-exclude="true"
-													class={`rounded-lg cursor-pointer border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "markdown" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
+													class={`rounded-lg cursor-pointer border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "markdown" ? "border-primary/30 bg-primary/15 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
 													aria-label={`Copy question ${question.questionNumber} as markdown`}
 												>
 													{copiedQuestionStatus?.slot ===
@@ -1952,7 +1958,7 @@ export default function QuizReviewPage({
 														);
 													}}
 													data-copy-exclude="true"
-													class={`rounded-lg cursor-pointer border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "image" ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
+													class={`rounded-lg cursor-pointer border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-colors ${copiedQuestionStatus?.slot === question.slot && copiedQuestionStatus.mode === "image" ? "border-primary/30 bg-primary/15 text-primary" : "border-edge bg-page-secondary text-content-muted hover:bg-page"}`}
 													aria-label={`Copy question ${question.questionNumber} as image`}
 												>
 													{copiedQuestionStatus?.slot ===
@@ -1973,7 +1979,7 @@ export default function QuizReviewPage({
 														{studyModeActive && (
 															<button
 																type="button"
-																class="rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+																class="rounded-lg border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/15 text-primary hover:bg-primary/20 cursor-pointer"
 																onClick={() => toggleRevealAnswer(question)}
 																aria-label={`Reveal answer for question ${question.questionNumber}`}
 															>
@@ -2130,7 +2136,7 @@ export default function QuizReviewPage({
 														{studyModeActive && (
 															<button
 																type="button"
-																class="rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+																class="rounded-lg border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/15 text-primary hover:bg-primary/20 cursor-pointer"
 																onClick={() => toggleRevealAnswer(question)}
 																aria-label={`Reveal answer for question ${question.questionNumber}`}
 															>
@@ -2274,13 +2280,13 @@ export default function QuizReviewPage({
 															</div>
 														)}
 														{question.rightAnswerHtml && (
-																	<div class="rounded-2xl! mt-2 border-2 border-primary/30 bg-primary/5 p-2">
-																		<div class="text-[11px] font-semibold uppercase tracking-wide text-primary mb-1">
+																<div class="rounded-2xl! border-2 border-primary/30 bg-primary/5 p-2">
+																	<div class="text-[11px] font-semibold uppercase tracking-wide text-primary mb-1">
 																	Correct
 																	Answer
 																</div>
 																<div
-																			class="text-sm leading-relaxed question-correct [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_ul]:mb-1.5 [&_ol]:mb-1.5 [&_a]:text-primary [&_a]:underline"
+																		class="text-sm leading-relaxed question-correct [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_ul]:mb-1.5 [&_ol]:mb-1.5 [&_a]:text-primary [&_a]:underline"
 																	dangerouslySetInnerHTML={{
 																		__html: question.rightAnswerHtml,
 																	}}
@@ -2329,7 +2335,7 @@ export default function QuizReviewPage({
 																	!hasPreviousQuestion
 																}
 																data-copy-exclude="true"
-																class="rounded-lg border border-edge bg-page px-2 py-1 text-xs font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
+																class="rounded-lg border border-edge bg-page px-1.5 py-0.5 text-[11px] font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
 															>
 																Prev
 															</button>
@@ -2342,7 +2348,7 @@ export default function QuizReviewPage({
 																	!hasNextQuestion
 																}
 																data-copy-exclude="true"
-																class="rounded-lg border border-edge bg-page px-2 py-1 text-xs font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
+																class="rounded-lg border border-edge bg-page px-1.5 py-0.5 text-[11px] font-semibold text-content disabled:cursor-not-allowed disabled:opacity-40"
 															>
 																Next
 															</button>
