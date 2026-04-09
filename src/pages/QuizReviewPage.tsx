@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { CheckCircle2, CircleHelp, XCircle } from "lucide-preact";
 import { toBlob as htmlToImageBlob } from "html-to-image";
+import { Logo } from "@/src/components/ui/Logo";
 import { getAttemptReview } from "../data/adapter/moodlews/quiz";
+import { changeTheme, theme } from "../stores/theme";
 import type {
 	QuizReviewPageProps,
 	QuizReviewPayload,
@@ -21,6 +23,7 @@ import {
 	collectImageSources,
 	CopyStatus,
 } from "../helper/quizReview";
+import { defaultThemes } from "../types/themes";
 
 function formatUnixTime(value: number | null): string {
 	if (value === null || Number.isNaN(value)) {
@@ -162,6 +165,39 @@ function getVerdictStyles(verdict: QuestionVerdict) {
 	}
 }
 
+type PracticeComparisonKind = "match" | "different" | "incomplete";
+
+interface PracticeComparisonResult {
+	kind: PracticeComparisonKind;
+	message: string;
+}
+
+function getPracticeComparisonStyles(kind: PracticeComparisonKind): string {
+	switch (kind) {
+		case "match":
+			return "border-primary/30 bg-primary/10 text-primary";
+		case "different":
+			return "border-danger/30 bg-danger/10 text-danger";
+		default:
+			return "border-edge bg-page text-content-muted";
+	}
+}
+
+function normalizePracticeValue(value: string | null | undefined): string {
+	return (value ?? "").trim();
+}
+
+function areIndexSetsEqual(left: number[], right: number[]): boolean {
+	if (left.length !== right.length) {
+		return false;
+	}
+
+	const leftSorted = [...left].sort((a, b) => a - b);
+	const rightSorted = [...right].sort((a, b) => a - b);
+
+	return leftSorted.every((value, index) => value === rightSorted[index]);
+}
+
 const CLOZE_SELECT_CLASSES =
 	"p-1.5 border-2 border-primary/40 rounded-lg bg-primary/10 text-content text-sm font-semibold min-w-[11rem] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary";
 
@@ -278,7 +314,14 @@ function createMultianswerRenderHtml(formulation: HTMLElement): string {
 		.forEach((node) => node.remove());
 
 	Array.from(renderClone.querySelectorAll<HTMLSelectElement>("select")).forEach(
-		(selectNode) => {
+		(selectNode, index) => {
+			const practiceId = selectNode.id || `cloze-${index + 1}`;
+
+			if (!selectNode.id) {
+				selectNode.id = practiceId;
+			}
+
+			selectNode.setAttribute("data-practice-id", practiceId);
 			selectNode.removeAttribute("disabled");
 			selectNode.setAttribute("class", CLOZE_SELECT_CLASSES);
 			selectNode.setAttribute("data-practice-select", "true");
@@ -289,12 +332,34 @@ function createMultianswerRenderHtml(formulation: HTMLElement): string {
 		renderClone.querySelectorAll<HTMLInputElement>(
 			".subquestion input:not([type='hidden'])",
 		),
-	).forEach((inputNode) => {
+	).forEach((inputNode, index) => {
+		const practiceId = inputNode.id || `cloze-input-${index + 1}`;
+
+		if (!inputNode.id) {
+			inputNode.id = practiceId;
+		}
+
+		inputNode.setAttribute("data-practice-id", practiceId);
 		inputNode.removeAttribute("disabled");
 		inputNode.removeAttribute("readonly");
 		inputNode.setAttribute("class", CLOZE_INPUT_CLASSES);
 		inputNode.setAttribute("data-practice-input", "true");
 	});
+
+	Array.from(renderClone.querySelectorAll<HTMLTextAreaElement>("textarea")).forEach(
+		(textareaNode, index) => {
+			const practiceId = textareaNode.id || `cloze-textarea-${index + 1}`;
+
+			if (!textareaNode.id) {
+				textareaNode.id = practiceId;
+			}
+
+			textareaNode.setAttribute("data-practice-id", practiceId);
+			textareaNode.removeAttribute("disabled");
+			textareaNode.removeAttribute("readonly");
+			textareaNode.setAttribute("data-practice-input", "true");
+		},
+	);
 
 	return renderClone.innerHTML.trim();
 }
@@ -354,6 +419,81 @@ function createMaskedPracticeHtml(readyToRenderHtml: string): string {
 	return maskedContainer.innerHTML.trim();
 }
 
+function applyPracticeValuesToHtml(
+	html: string,
+	valuesById: Record<string, string> | undefined,
+): string {
+	if (!html || !valuesById || Object.keys(valuesById).length === 0) {
+		return html;
+	}
+
+	const container = document.createElement("div");
+	container.innerHTML = html;
+
+	Array.from(
+		container.querySelectorAll<HTMLSelectElement>("[data-practice-select='true']"),
+	).forEach((selectNode, index) => {
+		const practiceId =
+			selectNode.dataset.practiceId || selectNode.id || `cloze-${index + 1}`;
+		const storedValue = valuesById[practiceId];
+
+		if (typeof storedValue !== "string") {
+			return;
+		}
+
+		const hasOption = Array.from(selectNode.options).some(
+			(option) => option.value === storedValue,
+		);
+		selectNode.value = hasOption ? storedValue : "";
+	});
+
+	Array.from(
+		container.querySelectorAll<HTMLInputElement>("[data-practice-input='true']"),
+	).forEach((inputNode, index) => {
+		const practiceId =
+			inputNode.dataset.practiceId ||
+			inputNode.id ||
+			`cloze-input-${index + 1}`;
+		const storedValue = valuesById[practiceId];
+
+		if (typeof storedValue !== "string") {
+			return;
+		}
+
+		inputNode.value = storedValue;
+		inputNode.setAttribute("value", storedValue);
+	});
+
+	Array.from(
+		container.querySelectorAll<HTMLTextAreaElement>(
+			"textarea[data-practice-input='true']",
+		),
+	).forEach((textareaNode, index) => {
+		const practiceId =
+			textareaNode.dataset.practiceId ||
+			textareaNode.id ||
+			`cloze-textarea-${index + 1}`;
+		const storedValue = valuesById[practiceId];
+
+		if (typeof storedValue !== "string") {
+			return;
+		}
+
+		textareaNode.value = storedValue;
+		textareaNode.textContent = storedValue;
+	});
+
+	return container.innerHTML.trim();
+}
+
+function getClozeOptionLabel(
+	dropdown: ParsedClozeDropdown,
+	value: string,
+): string {
+	const option = dropdown.options.find((item) => item.value === value);
+	return option?.label || value || "—";
+}
+
 function buildMultianswerSummaryAnswers(
 	clozeDropdowns: ParsedClozeDropdown[],
 ): ParsedAnswer[] {
@@ -392,6 +532,31 @@ function getQuestionPromptHtml(container: HTMLElement): string {
 	return promptClone.innerHTML.trim();
 }
 
+function getPracticeSelectionMode(
+	container: HTMLElement,
+	isMultianswer: boolean,
+): "single" | "multiple" {
+	if (isMultianswer) {
+		return "multiple";
+	}
+
+	const inputs = Array.from(
+		container.querySelectorAll<HTMLInputElement>(
+			".answer input[type='radio'], .answer input[type='checkbox']",
+		),
+	);
+
+	if (inputs.some((input) => input.type === "checkbox")) {
+		return "multiple";
+	}
+
+	if (inputs.some((input) => input.type === "radio")) {
+		return "single";
+	}
+
+	return "multiple";
+}
+
 function parseQuestion(question: RawQuestion): ParsedQuestion {
 	const container = document.createElement("div");
 	container.innerHTML = question.html || "";
@@ -408,6 +573,10 @@ function parseQuestion(question: RawQuestion): ParsedQuestion {
 	const rightAnswerHtml = getHtml(container, ".rightanswer");
 	const formulation = container.querySelector(".formulation");
 	const isMultianswer = question.type === "multianswer";
+	const practiceSelectionMode = getPracticeSelectionMode(
+		container,
+		isMultianswer,
+	);
 	const clozeDropdowns =
 		isMultianswer && formulation instanceof HTMLElement
 			? parseMultianswerDropdowns(formulation)
@@ -447,6 +616,7 @@ function parseQuestion(question: RawQuestion): ParsedQuestion {
 		type: question.type,
 		page: question.page,
 		questionNumber,
+		practiceSelectionMode,
 		state,
 		verdict,
 		verdictLabel,
@@ -478,6 +648,8 @@ function parseReview(review: QuizReviewPayload): ParsedReview {
 
 	return {
 		grade: String(review.grade ?? "—"),
+		displayTitle: String(review.reviewTitle ?? ""),
+		courseName: String(review.courseName ?? ""),
 		attemptLabel:
 			review.attempt && typeof review.attempt.attempt !== "undefined"
 				? `Attempt ${String(review.attempt.attempt)}`
@@ -497,7 +669,11 @@ function parseReview(review: QuizReviewPayload): ParsedReview {
 	};
 }
 
-export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
+export default function QuizReviewPage({
+	attemptId,
+	initialPayload = null,
+	showThemeSelector = false,
+}: QuizReviewPageProps) {
 	const [review, setReview] = useState<ParsedReview | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -511,10 +687,230 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 	);
 	const [copiedQuestionStatus, setCopiedQuestionStatus] =
 		useState<CopyStatus | null>(null);
+	const [practiceSelections, setPracticeSelections] = useState<
+		Record<number, number[]>
+	>({});
+	const [practiceClozeSelections, setPracticeClozeSelections] = useState<
+		Record<number, Record<string, string>>
+	>({});
+	const [practiceComparisons, setPracticeComparisons] = useState<
+		Record<number, PracticeComparisonResult>
+	>({});
 	const pageContainerRef = useRef<HTMLDivElement>(null);
 	const copiedResetTimerRef = useRef<number | null>(null);
 
-	const toogleRevealAnswer = (questionSlot: number) => {
+	const clearPracticeComparison = (questionSlot: number) => {
+		setPracticeComparisons((current) => {
+			if (!current[questionSlot]) {
+				return current;
+			}
+
+			const next = { ...current };
+			delete next[questionSlot];
+			return next;
+		});
+	};
+
+	const setPracticeClozeValues = (
+		questionSlot: number,
+		valuesById: Record<string, string>,
+	) => {
+		if (Object.keys(valuesById).length === 0) {
+			return;
+		}
+
+		setPracticeClozeSelections((current) => ({
+			...current,
+			[questionSlot]: {
+				...(current[questionSlot] ?? {}),
+				...valuesById,
+			},
+		}));
+	};
+
+	const readPracticeClozeValuesFromDom = (
+		questionSlot: number,
+	): Record<string, string> => {
+		const questionElement = document.getElementById(`question-${questionSlot}`);
+		if (!(questionElement instanceof HTMLElement)) {
+			return {};
+		}
+
+		const valuesById: Record<string, string> = {};
+
+		Array.from(
+			questionElement.querySelectorAll<HTMLSelectElement>(
+				"[data-practice-select='true']",
+			),
+		).forEach((selectNode, index) => {
+			const practiceId =
+				selectNode.dataset.practiceId ||
+				selectNode.id ||
+				`cloze-${index + 1}`;
+			valuesById[practiceId] = normalizePracticeValue(selectNode.value);
+		});
+
+		Array.from(
+			questionElement.querySelectorAll<HTMLInputElement>(
+				"[data-practice-input='true']",
+			),
+		).forEach((inputNode, index) => {
+			const practiceId =
+				inputNode.dataset.practiceId ||
+				inputNode.id ||
+				`cloze-input-${index + 1}`;
+			valuesById[practiceId] = normalizePracticeValue(inputNode.value);
+		});
+
+		Array.from(
+			questionElement.querySelectorAll<HTMLTextAreaElement>(
+				"textarea[data-practice-input='true']",
+			),
+		).forEach((textareaNode, index) => {
+			const practiceId =
+				textareaNode.dataset.practiceId ||
+				textareaNode.id ||
+				`cloze-textarea-${index + 1}`;
+			valuesById[practiceId] = normalizePracticeValue(textareaNode.value);
+		});
+
+		return valuesById;
+	};
+
+	const togglePracticeSelection = (
+		question: ParsedQuestion,
+		answerIndex: number,
+	) => {
+		const questionSlot = question.slot;
+		const selectionMode = question.practiceSelectionMode;
+
+		setPracticeSelections((current) => {
+			const existing = current[questionSlot] ?? [];
+			const next =
+				selectionMode === "single"
+					? existing.includes(answerIndex)
+						? existing
+						: [answerIndex]
+					: existing.includes(answerIndex)
+						? existing.filter((index) => index !== answerIndex)
+						: [...existing, answerIndex];
+
+			return {
+				...current,
+				[questionSlot]: next,
+			};
+		});
+
+		clearPracticeComparison(questionSlot);
+	};
+
+	const setPracticeComparison = (
+		questionSlot: number,
+		result: PracticeComparisonResult,
+	) => {
+		setPracticeComparisons((current) => ({
+			...current,
+			[questionSlot]: result,
+		}));
+	};
+
+	const compareQuestionAttempt = (
+		question: ParsedQuestion,
+		clozeSelectionOverride?: Record<string, string>,
+	) => {
+		const isMultianswerPractice =
+			question.type === "multianswer" && question.readyToRenderHtml.length > 0;
+
+		if (isMultianswerPractice && question.clozeDropdowns.length > 0) {
+			const mergedSelections = {
+				...(practiceClozeSelections[question.slot] ?? {}),
+				...readPracticeClozeValuesFromDom(question.slot),
+				...(clozeSelectionOverride ?? {}),
+			};
+			setPracticeClozeValues(question.slot, mergedSelections);
+
+			const hasAnySelection = question.clozeDropdowns.some((dropdown, index) => {
+				const key = dropdown.id || `cloze-${index + 1}`;
+				return normalizePracticeValue(mergedSelections[key]) !== "";
+			});
+
+			if (!hasAnySelection) {
+				setPracticeComparison(question.slot, {
+					kind: "incomplete",
+					message: "Choose at least one option first.",
+				});
+				return;
+			}
+
+			const total = question.clozeDropdowns.length;
+			const matchedCount = question.clozeDropdowns.filter(
+				(dropdown, index) => {
+					const key = dropdown.id || `cloze-${index + 1}`;
+					const currentValue = normalizePracticeValue(mergedSelections[key]);
+					const knownValue = normalizePracticeValue(
+						dropdown.originalSelectedValue,
+					);
+
+					return currentValue === knownValue;
+				},
+			).length;
+
+			setPracticeComparison(question.slot, {
+				kind: matchedCount === total ? "match" : "different",
+				message:
+					matchedCount === total
+						? "Matches your attempt."
+						: `${matchedCount}/${total} parts match your attempt.`,
+			});
+
+			return;
+		}
+
+		const knownSelectionIndexes = question.answers.reduce<number[]>(
+			(indices, answer, index) => {
+				if (answer.selected) {
+					indices.push(index);
+				}
+
+				return indices;
+			},
+			[],
+		);
+		const selectedIndexes = practiceSelections[question.slot] ?? [];
+
+		if (selectedIndexes.length === 0) {
+			setPracticeComparison(question.slot, {
+				kind: "incomplete",
+				message: "Select an answer first.",
+			});
+			return;
+		}
+
+		setPracticeComparison(question.slot, {
+			kind: areIndexSetsEqual(selectedIndexes, knownSelectionIndexes)
+				? "match"
+				: "different",
+			message: areIndexSetsEqual(selectedIndexes, knownSelectionIndexes)
+				? "Matches your attempt."
+				: "Different from your attempt.",
+		});
+	};
+
+	const toggleRevealAnswer = (question: ParsedQuestion) => {
+		const questionSlot = question.slot;
+		const currentlyRevealed = answeredRevealed[questionSlot] ?? false;
+
+		if (!currentlyRevealed) {
+			const latestFromDom = readPracticeClozeValuesFromDom(questionSlot);
+			if (Object.keys(latestFromDom).length > 0) {
+				setPracticeClozeValues(questionSlot, latestFromDom);
+			}
+
+			compareQuestionAttempt(question, latestFromDom);
+		} else {
+			clearPracticeComparison(questionSlot);
+		}
+
 		setAnsweredRevealed((current) => ({
 			...current,
 			[questionSlot]: !current[questionSlot],
@@ -529,6 +925,11 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			setError(null);
 
 			try {
+				if (initialPayload) {
+					setReview(parseReview(initialPayload));
+					return;
+				}
+
 				const pageParam = new URLSearchParams(
 					window.location.search,
 				).get("page");
@@ -571,7 +972,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 		return () => {
 			cancelled = true;
 		};
-	}, [attemptId]);
+	}, [attemptId, initialPayload]);
 
 	useEffect(() => {
 		if (!review || review.questions.length === 0) {
@@ -592,6 +993,12 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 
 			return current;
 		});
+	}, [review]);
+
+	useEffect(() => {
+		setPracticeSelections({});
+		setPracticeClozeSelections({});
+		setPracticeComparisons({});
 	}, [review]);
 
 	useEffect(() => {
@@ -745,11 +1152,11 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 		};
 
 		const printHtml = review.questions.map(buildQuestionPrintHtml).join("");
-		const documentTitle = `Quiz Review ${attemptId}`;
+		const documentTitle = `${review.displayTitle || "Quiz Review"}`;
 		const summaryHeader = `
 			<header class="document-header">
 				<div>
-					<div class="eyebrow">Quiz Review</div>
+					<div class="eyebrow">${escapeHtml(review.courseName || "Review")}</div>
 					<h1>${escapeHtml(documentTitle)}</h1>
 					<p>Rendered with sceless.</p>
 				</div>
@@ -824,6 +1231,32 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 					background: linear-gradient(135deg, rgba(33, 83, 211, 0.08), rgba(245, 239, 229, 0.94));
 					border: 1px solid color-mix(in srgb, var(--primary) 22%, white);
 					border-radius: 14px;
+				}
+				.brand-row {
+					display: inline-flex;
+					align-items: center;
+					gap: 6px;
+					margin-bottom: 6px;
+				}
+				.brand-mark {
+					display: inline-flex;
+					align-items: center;
+					justify-content: center;
+					width: 26px;
+					height: 14px;
+					color: var(--primary-strong);
+				}
+				.brand-mark svg {
+					width: 100%;
+					height: 100%;
+					display: block;
+				}
+				.brand-word {
+					font-size: 10px;
+					font-weight: 800;
+					letter-spacing: 0.1em;
+					text-transform: uppercase;
+					color: var(--content-muted);
 				}
 				.eyebrow {
 					display: inline-flex;
@@ -917,7 +1350,6 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 					font-size: 8px;
 					font-weight: 700;
 					line-height: 1;
-					box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
 				}
 				.question-pill { background: var(--primary); color: white; }
 				.question-type { background: #e7ebf0; color: var(--content); }
@@ -929,7 +1361,7 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 				.question-verdict.unknown { background: #e7ebf0; color: var(--content-muted); }
 				.question-body { padding: 10px; display: grid; gap: 8px; }
 				.panel {
-					// border: 1px solid color-mix(in srgb, var(--edge) 88%, white);
+					/* border intentionally omitted for cleaner print cards */
 					border-radius: 10px;
 					background: var(--page-secondary);
 					padding: 9px;
@@ -1191,24 +1623,77 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 			? [activeQuestion]
 			: review.questions
 		: [];
+	const displayTitle = review?.displayTitle || `Quiz Review ${attemptId}`;
+	const courseName = review?.courseName || "";
+
+	const handleThemeChange = async (event: Event) => {
+		const nextThemeName = (event.currentTarget as HTMLSelectElement).value;
+		const nextTheme = defaultThemes.find((item) => item.name === nextThemeName);
+
+		if (!nextTheme) {
+			return;
+		}
+
+		await changeTheme(nextTheme);
+	};
 
 	return (
-		<div ref={pageContainerRef} class="p-4 lg:p-6 h-full overflow-y-auto">
-			<div class="mb-4 flex flex-col gap-3">
-				<div class="flex flex-wrap items-center gap-3">
-					<h1 class="text-xl font-bold text-content">
-						Quiz Review {attemptId}
-					</h1>
-					{review && (
-						<>
-							<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">
-								{review.grade}
-							</span>
-							<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-edge text-content-muted capitalize">
-								{review.state}
-							</span>
-						</>
-					)}
+		<div
+			ref={pageContainerRef}
+			class="p-4 lg:p-6 h-full overflow-y-auto"
+			style={{
+				fontFamily: "'Plus Jakarta Sans', 'Inter', 'Segoe UI', sans-serif",
+			}}
+		>
+			<div class="mb-5 flex flex-col gap-3">
+				<div class="flex flex-wrap items-start justify-between gap-3">
+					<div class="flex min-w-0 items-center gap-3">
+						<div class="rounded-2xl! border border-edge bg-page px-3 py-2">
+							<Logo class="w-24 text-primary" />
+						</div>
+						<div class="min-w-0">
+							<h1 class="truncate text-xl font-bold text-content">
+								{displayTitle}
+							</h1>
+							{courseName && (
+								<p class="mt-1 text-xs font-semibold text-content-muted">
+									{courseName}
+								</p>
+							)}
+						</div>
+					</div>
+					<div class="ml-auto flex flex-col items-end gap-2">
+						{showThemeSelector && (
+							<label class="flex items-center rounded-xl! border border-edge bg-page px-2.5 py-1.5">
+								<span class="text-[10px] font-semibold uppercase tracking-wide text-content-muted">
+									Theme
+								</span>
+								<select
+									value={theme.value.name}
+									onChange={(event) => {
+										void handleThemeChange(event);
+									}}
+									class="rounded-xl! ml-4 border-2 border-edge bg-page-secondary px-2.5 py-1.5 text-xs font-semibold text-content focus:outline-none focus:ring-2 focus:ring-primary/40"
+								>
+									{defaultThemes.map((themeOption) => (
+										<option key={themeOption.name} value={themeOption.name}>
+											{themeOption.name}
+										</option>
+									))}
+								</select>
+							</label>
+						)}
+						{review && (
+							<div class="flex items-center gap-2">
+								<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-primary/20 text-primary">
+									{review.grade}
+								</span>
+								<span class="text-xs font-semibold px-2 py-1 rounded-lg bg-edge text-content-muted capitalize">
+									{review.state}
+								</span>
+							</div>
+						)}
+					</div>
 				</div>
 			</div>
 
@@ -1276,40 +1761,40 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 							</div>
 						</aside>
 						<aside class="rounded-2xl border-2 border-edge bg-page-secondary p-3">
-							<div class="mb-3 flex items-center justify-between gap-2">
+							<div class="mb-3 space-y-2">
 								<div class="text-sm font-semibold text-content">
-									Review
+									View Controls
 								</div>
-								<button
-									type="button"
-									onClick={() =>
-										setShowOneQuestionAtATime(
-											(current) => !current,
-										)
-									}
-									aria-pressed={showOneQuestionAtATime}
-									class={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${showOneQuestionAtATime ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page text-content-muted"}`}
-								>
-									One at a time
-								</button>
-								<button
-									type="button"
-									onClick={() =>
-										setStudyModeActive(
-											(current) => !current,
-										)
-									}
-									aria-pressed={studyModeActive}
-									class={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${studyModeActive ? "border-primary/30 bg-primary/10 text-primary" : "border-edge bg-page text-content-muted"}`}
-								>
-									Study Mode
-								</button>
+								<div class="grid grid-cols-1 gap-2">
+									<button
+										type="button"
+										onClick={() =>
+											setShowOneQuestionAtATime(
+												(current) => !current,
+											)
+										}
+										aria-pressed={showOneQuestionAtATime}
+										class={`rounded-xl! border px-3 py-2 text-xs font-semibold transition-all ${showOneQuestionAtATime ? "border-primary bg-primary text-on-primary" : "border-edge bg-page text-content-muted hover:border-primary/40 hover:text-content"}`}
+									>
+										One-at-a-time
+									</button>
+									<button
+										type="button"
+										onClick={() =>
+											setStudyModeActive((current) => !current)
+										}
+										aria-pressed={studyModeActive}
+										class={`rounded-xl! border px-3 py-2 text-xs font-semibold transition-all ${studyModeActive ? "border-primary bg-primary text-on-primary" : "border-edge bg-page text-content-muted hover:border-primary/40 hover:text-content"}`}
+									>
+										Study Mode
+									</button>
+								</div>
 							</div>
 
 							<button
 								type="button"
 								onClick={exportQuizToPdf}
-								class="mb-3 w-full rounded-xl border-2 border-primary bg-primary/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/15 print:hidden"
+								class="mb-3 w-full rounded-xl! border-2 border-primary bg-primary/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-primary transition-colors hover:bg-primary/15 print:hidden"
 							>
 								EXPORT QUIZ TO PDF
 							</button>
@@ -1368,23 +1853,59 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 
 								const isRevealed =
 									answeredRevealed[question.slot] ?? false;
+								const practiceSelectionIndexes =
+									practiceSelections[question.slot] ?? [];
+								const clozeSelectionValues =
+									practiceClozeSelections[question.slot] ?? {};
+								const practiceComparison =
+									practiceComparisons[question.slot] ?? null;
 								const isMultianswerPractice =
 									question.type === "multianswer" &&
 									question.readyToRenderHtml.length > 0;
 								const hidePracticeAnswers =
 									studyModeActive && !isRevealed;
-								const practiceHtml =
+								const basePracticeHtml =
 									hidePracticeAnswers && isMultianswerPractice
 										? createMaskedPracticeHtml(
 												question.readyToRenderHtml,
 										  )
 										: question.readyToRenderHtml;
+								const practiceHtml =
+									isMultianswerPractice
+										? applyPracticeValuesToHtml(
+												basePracticeHtml,
+												clozeSelectionValues,
+										  )
+										: question.readyToRenderHtml;
+								const clozeNowVsPast = question.clozeDropdowns.map(
+									(dropdown, index) => {
+										const key = dropdown.id || `cloze-${index + 1}`;
+										const nowValue = normalizePracticeValue(
+											clozeSelectionValues[key],
+										);
+										const pastValue = normalizePracticeValue(
+											dropdown.originalSelectedValue,
+										);
+										const hasNowSelection = nowValue !== "";
+
+										return {
+											id: key,
+											prompt: dropdown.prompt,
+											nowLabel: hasNowSelection
+												? getClozeOptionLabel(dropdown, nowValue)
+												: "—",
+											pastLabel: dropdown.originalSelectedText || "—",
+											hasNowSelection,
+											matchesPast: hasNowSelection && nowValue === pastValue,
+										};
+									},
+								);
 
 								return (
 									<article
 										key={`${question.slot}-${question.page}`}
 										id={`question-${question.slot}`}
-										class="scroll-mt-4 rounded-2xl border-2 border-edge bg-page overflow-hidden"
+										class="scroll-mt-4 rounded-3xl! border-2 border-edge bg-page overflow-hidden "
 									>
 										<div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 bg-page-secondary border-b-2 border-edge">
 											<div class="flex flex-wrap items-center gap-2">
@@ -1453,30 +1974,145 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 															<button
 																type="button"
 																class="rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
-																onClick={() =>
-																	toogleRevealAnswer(question.slot)
-																}
+																onClick={() => toggleRevealAnswer(question)}
 																aria-label={`Reveal answer for question ${question.questionNumber}`}
 															>
-																{isRevealed
-																	? "HIDE ANSWER"
-																	: "REVEAL ANSWER"}
+																{isRevealed ? "HIDE ANSWER" : "REVEAL ANSWER"}
 															</button>
 														)}
 													</div>
-													<div class="rounded-xl border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-edge [&_th]:bg-page [&_th]:px-2 [&_th]:py-1.5 [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1.5 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
+													{studyModeActive &&
+														practiceComparison && (
+															<div
+																class={`rounded-lg border px-2 py-1 text-[10px] font-semibold ${getPracticeComparisonStyles(practiceComparison.kind)}`}
+															>
+																{practiceComparison.message}
+															</div>
+														)}
+													<div
+														onChange={(event) => {
+															const target = event.target;
+
+															if (
+																!(target instanceof HTMLSelectElement) &&
+																!(target instanceof HTMLInputElement) &&
+																!(target instanceof HTMLTextAreaElement)
+															) {
+																return;
+															}
+
+															if (
+																target.dataset.practiceSelect !== "true" &&
+																target.dataset.practiceInput !== "true"
+															) {
+																return;
+															}
+
+															const practiceId =
+																target.dataset.practiceId || target.id;
+															if (!practiceId) {
+																return;
+															}
+
+															const nextForQuestion = {
+																...clozeSelectionValues,
+																[practiceId]: normalizePracticeValue(target.value),
+															};
+
+															setPracticeClozeValues(question.slot, nextForQuestion);
+
+															if (studyModeActive && isRevealed) {
+																compareQuestionAttempt(question, nextForQuestion);
+															} else {
+																clearPracticeComparison(question.slot);
+															}
+														}}
+														onInput={(event) => {
+															const target = event.target;
+
+															if (
+																!(target instanceof HTMLInputElement) &&
+																!(target instanceof HTMLTextAreaElement)
+															) {
+																return;
+															}
+
+															if (target.dataset.practiceInput !== "true") {
+																return;
+															}
+
+															const practiceId =
+																target.dataset.practiceId || target.id;
+															if (!practiceId) {
+																return;
+															}
+
+															const nextForQuestion = {
+																...clozeSelectionValues,
+																[practiceId]: normalizePracticeValue(target.value),
+															};
+
+															setPracticeClozeValues(question.slot, nextForQuestion);
+
+															if (studyModeActive && isRevealed) {
+																compareQuestionAttempt(question, nextForQuestion);
+															} else {
+																clearPracticeComparison(question.slot);
+															}
+														}}
+														class="rounded-2xl! border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:w-full [&_table]:border-separate [&_table]:border-spacing-0 [&_table]:overflow-hidden [&_table]:rounded-xl [&_table]:border [&_table]:border-edge [&_th]:border [&_th]:border-edge [&_th]:bg-page [&_th]:px-2 [&_th]:py-1.5 [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1.5 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline"
+													>
 														<div
 															dangerouslySetInnerHTML={{
 																__html: practiceHtml,
 															}}
 														/>
 													</div>
+													{studyModeActive &&
+														isRevealed &&
+														clozeNowVsPast.length > 0 && (
+															<section class="rounded-2xl! border border-edge bg-page-secondary p-3 space-y-2">
+																<div class="text-[10px] font-semibold uppercase tracking-wide text-content-muted">
+																	Now vs Past Selection
+																</div>
+																<div class="space-y-1.5">
+																	{clozeNowVsPast.map((part) => (
+																		<div
+																			key={`${question.slot}-${part.id}`}
+																			class={`rounded-xl! border px-2 py-1.5 ${part.hasNowSelection ? (part.matchesPast ? "border-primary/30 bg-primary/10" : "border-danger/30 bg-danger/10") : "border-edge bg-page"}`}
+																		>
+																			<div class="text-[10px] font-semibold text-content">
+																				{part.prompt}
+																			</div>
+																			<div class="mt-1 grid grid-cols-1 gap-1 sm:grid-cols-2">
+																				<div class="rounded-lg! border border-edge bg-page px-2 py-1 text-[10px]">
+																					<span class="mr-1 font-bold uppercase tracking-wide text-primary">
+																						Now:
+																					</span>
+																					<span class="text-content">
+																						{part.nowLabel}
+																					</span>
+																				</div>
+																				<div class="rounded-lg! border border-edge bg-page px-2 py-1 text-[10px]">
+																					<span class="mr-1 font-bold uppercase tracking-wide text-content-muted">
+																						Past:
+																					</span>
+																					<span class="text-content">
+																						{part.pastLabel}
+																					</span>
+																				</div>
+																			</div>
+																		</div>
+																	))}
+																</div>
+															</section>
+														)}
 
 
 												</section>
 											) : (
 												question.questionHtml && (
-													<section class="rounded-xl border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
+															<section class="rounded-2xl! border border-edge bg-page-secondary p-3 text-sm question-html [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_p]:mb-2 [&_p:last-child]:mb-0 [&_table]:w-full [&_table]:border-separate [&_table]:border-spacing-0 [&_table]:overflow-hidden [&_table]:rounded-xl [&_table]:border [&_table]:border-edge [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline">
 														<div
 															dangerouslySetInnerHTML={{
 																__html: question.questionHtml,
@@ -1493,55 +2129,97 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 														Answers
 														{studyModeActive && (
 															<button
+																type="button"
 																class="rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
-																onClick={() =>
-																	toogleRevealAnswer(
-																		question.slot,
-																	)
-																}
+																onClick={() => toggleRevealAnswer(question)}
 																aria-label={`Reveal answer for question ${question.questionNumber}`}
 															>
-																{isRevealed
-																	? "Hide"
-																	: "Reveal"}
+																{isRevealed ? "Hide" : "Reveal"}
 															</button>
 														)}
 													</div>
+													{studyModeActive &&
+														practiceComparison && (
+															<div
+																class={`rounded-lg border px-2 py-1 text-[10px] font-semibold ${getPracticeComparisonStyles(practiceComparison.kind)}`}
+															>
+																{practiceComparison.message}
+															</div>
+														)}
 													<div class="space-y-1.5">
 														{question.answers.map(
 															(answer, index) => {
 																const hideState =
 																	studyModeActive &&
 																	!isRevealed;
+																			const showRevealedPractice =
+																				studyModeActive &&
+																				isRevealed;
+																const practiceSelected =
+																	practiceSelectionIndexes.includes(index);
+																			const pastSelected = answer.selected;
+																			const answerCardClasses = [
+																				"!rounded-2xl border-2 p-2.5 transition-colors",
+																				hideState ? "cursor-pointer" : "",
+																				showRevealedPractice && practiceSelected
+																					? "ring-2 ring-primary/40"
+																					: "",
+																				!hideState && pastSelected
+																					? answer.incorrect
+																						? "border-danger bg-danger/10"
+																						: "border-primary bg-primary/10"
+																					: hideState && practiceSelected
+																						? "border-primary bg-primary/10"
+																						: showRevealedPractice && practiceSelected
+																							? "border-primary/40 bg-primary/5"
+																							: "border-edge bg-page-secondary",
+																			].join(" ");
+																			const bulletClasses = [
+																				"mt-1 h-3 w-3 shrink-0 rounded-full border-2",
+																				!hideState && pastSelected
+																					? answer.incorrect
+																						? "border-danger bg-danger"
+																						: "border-primary bg-primary"
+																					: (hideState || showRevealedPractice) && practiceSelected
+																						? "border-primary bg-primary"
+																						: "border-edge bg-page",
+																			].join(" ");
 
 																return (
 																	<div
 																		key={`${question.slot}-${index}`}
-																		class={[
-																			"rounded-xl border-2 p-2.5 transition-colors",
-																			!hideState &&
-																			answer.selected
-																				? answer.incorrect
-																					? "border-danger bg-danger/10"
-																					: "border-primary bg-primary/10"
-																				: "border-edge bg-page-secondary",
-																		].join(
-																			" ",
-																		)}
+																		onClick={() => {
+																			if (!hideState) {
+																				return;
+																			}
+
+																			togglePracticeSelection(
+																						question,
+																				index,
+																			);
+																		}}
+																		onKeyDown={(event) => {
+																			if (
+																				!hideState ||
+																				(event.key !== "Enter" &&
+																					event.key !== " ")
+																			) {
+																				return;
+																			}
+
+																			event.preventDefault();
+																			togglePracticeSelection(
+																						question,
+																				index,
+																			);
+																		}}
+																		role={hideState ? "button" : undefined}
+																		tabIndex={hideState ? 0 : undefined}
+																					class={answerCardClasses}
 																	>
 																		<div class="flex items-start gap-2.5">
 																			<div
-																				class={[
-																					"mt-1 h-3 w-3 shrink-0 rounded-full border-2",
-																					!hideState &&
-																					answer.selected
-																						? answer.incorrect
-																							? "border-danger bg-danger"
-																							: "border-primary bg-primary"
-																						: "border-edge bg-page",
-																				].join(
-																					" ",
-																				)}
+																							class={bulletClasses}
 																			/>
 																			<div class="flex-1 min-w-0 text-sm question-answer [&_p]:mb-2 [&_p:last-child]:mb-0 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_a]:text-primary [&_a]:underline">
 																				<div
@@ -1550,10 +2228,22 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 																					}}
 																				/>
 																			</div>
-																			{!hideState &&
-																				answer.selected && (
+																					{!studyModeActive &&
+																						pastSelected && (
 																					<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-edge text-content-muted uppercase">
 																						Selected
+																					</span>
+																				)}
+																					{(hideState || showRevealedPractice) &&
+																						practiceSelected && (
+																					<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-primary/10 text-primary uppercase">
+																								Now
+																							</span>
+																						)}
+																					{showRevealedPractice &&
+																						pastSelected && (
+																							<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-edge text-content-muted uppercase">
+																								Past
 																					</span>
 																				)}
 																		</div>
@@ -1569,14 +2259,14 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 												question.rightAnswerHtml) &&
 												(!studyModeActive ||
 													isRevealed) && (
-													<section class="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+															<section class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 pt-1">
 														{question.feedbackHtml && (
-															<div class="rounded-xl border-2 border-edge bg-page-secondary p-3">
-																<div class="text-[10px] font-semibold uppercase tracking-wide text-content-muted mb-2">
+																	<div class="rounded-2xl! border-2 border-edge bg-page-secondary p-4">
+																		<div class="text-[11px] font-semibold uppercase tracking-wide text-content-muted mb-2.5">
 																	Feedback
 																</div>
 																<div
-																	class="text-sm question-feedback [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline"
+																			class="text-sm leading-relaxed question-feedback [&_p]:mb-2.5 [&_p:last-child]:mb-0 [&_ul]:mb-2.5 [&_ol]:mb-2.5 [&_a]:text-primary [&_a]:underline"
 																	dangerouslySetInnerHTML={{
 																		__html: question.feedbackHtml,
 																	}}
@@ -1584,13 +2274,13 @@ export default function QuizReviewPage({ attemptId }: QuizReviewPageProps) {
 															</div>
 														)}
 														{question.rightAnswerHtml && (
-															<div class="rounded-xl border-2 border-primary/30 bg-primary/5 p-3">
-																<div class="text-[10px] font-semibold uppercase tracking-wide text-primary mb-2">
+																	<div class="rounded-2xl! border-2 border-primary/30 bg-primary/5 p-4">
+																		<div class="text-[11px] font-semibold uppercase tracking-wide text-primary mb-2.5">
 																	Correct
 																	Answer
 																</div>
 																<div
-																	class="text-sm question-correct [&_p]:mb-2 [&_p:last-child]:mb-0 [&_a]:text-primary [&_a]:underline"
+																			class="text-sm leading-relaxed question-correct [&_p]:mb-2.5 [&_p:last-child]:mb-0 [&_ul]:mb-2.5 [&_ol]:mb-2.5 [&_a]:text-primary [&_a]:underline"
 																	dangerouslySetInnerHTML={{
 																		__html: question.rightAnswerHtml,
 																	}}

@@ -43,7 +43,8 @@
   background: var(--theme-edge);
 }
 
-#sceless-root {
+#sceless-root,
+#sceless-quiz-review-root {
   font-family: 'Plus Jakarta Sans', sans-serif;
 }
 

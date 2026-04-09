@@ -1,6 +1,8 @@
 
 export interface QuizReviewPageProps {
 	attemptId: string;
+	initialPayload?: QuizReviewPayload | null;
+	showThemeSelector?: boolean;
 }
 
 export interface RawQuestion {
@@ -21,6 +23,8 @@ export interface QuizReviewPayload {
 	attempt?: Record<string, unknown>;
 	additionaldata?: Array<Record<string, unknown>>;
 	questions?: RawQuestion[];
+	reviewTitle?: string;
+	courseName?: string;
 }
 
 export interface ParsedAnswer {
@@ -53,6 +57,7 @@ export interface ParsedQuestion {
 	type: string;
 	page: number;
 	questionNumber: string;
+	practiceSelectionMode: "single" | "multiple";
 	state: string;
 	verdict: QuestionVerdict;
 	verdictLabel: string;
@@ -69,6 +74,8 @@ export interface ParsedQuestion {
 
 export interface ParsedReview {
 	grade: string;
+	displayTitle: string;
+	courseName: string;
 	attemptLabel: string;
 	state: string;
 	questionCount: number;
