@@ -764,7 +764,7 @@ function ensureStyles() {
 
 	#${ROOT_ID} .sceless-native-answer-row {
 		display: grid;
-		grid-template-columns: auto minmax(0, 1fr);
+		grid-template-columns: auto minmax(0, 1fr) auto;
 		gap: 8px;
 		align-items: start;
 		padding: 9px 10px;
@@ -811,8 +811,18 @@ function ensureStyles() {
 	}
 
 	#${ROOT_ID} .sceless-native-answer-row [data-region='answer-label'] {
+		display: flex !important;
+		flex-direction: row !important;
+		align-items: flex-start;
 		line-height: 1.5;
 		min-width: 0;
+	}
+
+	#${ROOT_ID} .sceless-native-answer-row > .icon {
+		grid-column: 3;
+		justify-self: end;
+		align-self: center;
+		margin: 0 !important;
 	}
 
 	#${ROOT_ID} .sceless-native-answer-row .answernumber {
@@ -933,7 +943,7 @@ function ensureStyles() {
 
 	#${ROOT_ID} .sceless-study-mode .que:not(.sceless-native-revealed) .answer .icon,
 	#${ROOT_ID} .sceless-study-mode .que:not(.sceless-native-revealed) .feedbackspan {
-		visibility: hidden !important;
+		display: none !important;
 	}
 
 	#${ROOT_ID} .sceless-study-mode .que:not(.sceless-native-revealed) .sceless-native-answer-row,
