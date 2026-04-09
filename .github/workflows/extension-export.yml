@@ -1,0 +1,56 @@
+name: Extension CI/CD Export
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: extension-export-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-export:
+    name: Build and Export Extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Chrome extension
+        run: pnpm build
+
+      - name: Build Firefox extension
+        run: pnpm build:firefox
+
+      - name: Upload Chrome artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sceless-chrome-mv3-${{ github.sha }}
+          path: .output/chrome-mv3
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Firefox artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sceless-firefox-mv2-${{ github.sha }}
+          path: .output/firefox-mv2
+          if-no-files-found: error
+          retention-days: 14
