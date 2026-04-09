@@ -2124,7 +2124,7 @@ export default function QuizReviewPage({
 
 											{!isMultianswerPractice &&
 												question.answers.length > 0 && (
-												<section class="space-y-1.5">
+												<section class="space-y-1">
 													<div class="text-[10px] flex items-center gap-2 font-semibold uppercase tracking-wide text-content-muted">
 														Answers
 														{studyModeActive && (
@@ -2146,7 +2146,7 @@ export default function QuizReviewPage({
 																{practiceComparison.message}
 															</div>
 														)}
-													<div class="space-y-1.5">
+													<div class="space-y-1">
 														{question.answers.map(
 															(answer, index) => {
 																const hideState =
@@ -2159,7 +2159,7 @@ export default function QuizReviewPage({
 																	practiceSelectionIndexes.includes(index);
 																			const pastSelected = answer.selected;
 																			const answerCardClasses = [
-																				"!rounded-2xl border-2 p-2.5 transition-colors",
+																				"!rounded-2xl border-2 p-1.5 transition-colors",
 																				hideState ? "cursor-pointer" : "",
 																				showRevealedPractice && practiceSelected
 																					? "ring-2 ring-primary/40"
@@ -2217,7 +2217,7 @@ export default function QuizReviewPage({
 																		tabIndex={hideState ? 0 : undefined}
 																					class={answerCardClasses}
 																	>
-																		<div class="flex items-start gap-2.5">
+																		<div class="flex items-start gap-2">
 																			<div
 																							class={bulletClasses}
 																			/>
@@ -2230,19 +2230,19 @@ export default function QuizReviewPage({
 																			</div>
 																					{!studyModeActive &&
 																						pastSelected && (
-																					<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-edge text-content-muted uppercase">
+																					<span class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-edge text-content-muted uppercase">
 																						Selected
 																					</span>
 																				)}
 																					{(hideState || showRevealedPractice) &&
 																						practiceSelected && (
-																					<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-primary/10 text-primary uppercase">
+																					<span class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-primary/10 text-primary uppercase">
 																								Now
 																							</span>
 																						)}
 																					{showRevealedPractice &&
 																						pastSelected && (
-																							<span class="shrink-0 text-[10px] font-bold px-1.5 py-1 rounded-lg bg-edge text-content-muted uppercase">
+																							<span class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-edge text-content-muted uppercase">
 																								Past
 																					</span>
 																				)}
@@ -2259,14 +2259,14 @@ export default function QuizReviewPage({
 												question.rightAnswerHtml) &&
 												(!studyModeActive ||
 													isRevealed) && (
-															<section class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 pt-1">
+															<section class="grid grid-cols-1 lg:grid-cols-2 gap-3">
 														{question.feedbackHtml && (
-																	<div class="rounded-2xl! border-2 border-edge bg-page-secondary p-4">
-																		<div class="text-[11px] font-semibold uppercase tracking-wide text-content-muted mb-2.5">
+																	<div class="rounded-2xl! border-2 border-edge bg-page-secondary p-2">
+																		<div class="text-[11px] font-semibold uppercase tracking-wide text-content-muted mb-1">
 																	Feedback
 																</div>
 																<div
-																			class="text-sm leading-relaxed question-feedback [&_p]:mb-2.5 [&_p:last-child]:mb-0 [&_ul]:mb-2.5 [&_ol]:mb-2.5 [&_a]:text-primary [&_a]:underline"
+																			class="text-sm leading-relaxed question-feedback [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_ul]:mb-1.5 [&_ol]:mb-1.5 [&_a]:text-primary [&_a]:underline"
 																	dangerouslySetInnerHTML={{
 																		__html: question.feedbackHtml,
 																	}}
@@ -2274,13 +2274,13 @@ export default function QuizReviewPage({
 															</div>
 														)}
 														{question.rightAnswerHtml && (
-																	<div class="rounded-2xl! border-2 border-primary/30 bg-primary/5 p-4">
-																		<div class="text-[11px] font-semibold uppercase tracking-wide text-primary mb-2.5">
+																	<div class="rounded-2xl! mt-2 border-2 border-primary/30 bg-primary/5 p-2">
+																		<div class="text-[11px] font-semibold uppercase tracking-wide text-primary mb-1">
 																	Correct
 																	Answer
 																</div>
 																<div
-																			class="text-sm leading-relaxed question-correct [&_p]:mb-2.5 [&_p:last-child]:mb-0 [&_ul]:mb-2.5 [&_ol]:mb-2.5 [&_a]:text-primary [&_a]:underline"
+																			class="text-sm leading-relaxed question-correct [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_ul]:mb-1.5 [&_ol]:mb-1.5 [&_a]:text-primary [&_a]:underline"
 																	dangerouslySetInnerHTML={{
 																		__html: question.rightAnswerHtml,
 																	}}
