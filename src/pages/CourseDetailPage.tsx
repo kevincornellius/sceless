@@ -4,7 +4,7 @@ import { Tab } from "../types/state";
 import { CourseSection } from "../types/course";
 import { loadCourseContents } from "../stores/indexeddb/courseContents";
 import { activeTabKey, getTabKey, openTabs } from "../stores/tabs";
-import { ViewModeSelector, ChronologicalView, GroupedView } from "../components/course/CourseContentView";
+import { ViewModeSelector, ChronologicalView, GroupedView, NewestView } from "../components/course/CourseContentView";
 import { Search, ChevronDown, ChevronRight, Sparkles } from "lucide-preact";
 import { getCourseTitle } from "../stores/indexeddb/course";
 import { markCourseSeen, clearNewModuleCount, getNewModuleIds } from "../stores/seenModules";
@@ -68,99 +68,91 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
     }
 
     return (
-        <div class="p-4 lg:p-6 h-full overflow-y-auto">
-            {/* Course Title */}
-            <h1 class="text-xl font-bold text-content mb-6">{courseTitle}</h1>
+        <div class="flex flex-col h-full">
+            {/* Fixed header */}
+            <div class="px-4 lg:px-6 pt-3 shrink-0">
+                <h1 class="text-base font-bold text-content mb-2">{courseTitle}</h1>
 
-            {/* What's New — collapsible, default closed */}
-            {newModuleIds.length > 0 && (
-                <div class="rounded-xl border-2 border-edge overflow-hidden mb-4">
-                    <button
-                        onClick={() => setShowNew(v => !v)}
-                        class="w-full flex items-center gap-3 px-4 py-3 bg-page-secondary hover:bg-edge/30 transition-colors cursor-pointer"
-                    >
-                        <Sparkles class="w-4 h-4 text-primary shrink-0" />
-                        <span class="text-sm font-semibold text-content">What's New</span>
-                        <span class="text-xs px-2 py-0.5 rounded font-bold bg-primary text-on-primary">{newModuleIds.length}</span>
-                        {showNew
-                            ? <ChevronDown class="w-4 h-4 text-content-muted ml-auto" />
-                            : <ChevronRight class="w-4 h-4 text-content-muted ml-auto" />
-                        }
-                    </button>
-                    {showNew && (
-                        <div class="divide-y-2 divide-edge">
-                            {contents.map(section => {
-                                const sectionNew = section.modules.filter(m => newModuleIds.includes(m.id));
-                                if (sectionNew.length === 0) return null;
-                                return (
-                                    <div key={section.id}>
-                                        <div class="px-4 py-2 bg-page/50">
-                                            <span class="text-xs font-semibold text-content-muted">{section.name}</span>
+                {/* What's New */}
+                {newModuleIds.length > 0 && (
+                    <div class="rounded-xl border-2 border-edge overflow-hidden mb-2">
+                        <button
+                            onClick={() => setShowNew(v => !v)}
+                            class="w-full flex items-center gap-3 px-3 py-2 bg-page-secondary hover:bg-edge/30 transition-colors cursor-pointer"
+                        >
+                            <Sparkles class="w-4 h-4 text-primary shrink-0" />
+                            <span class="text-sm font-semibold text-content">What's New</span>
+                            <span class="text-xs px-2 py-0.5 rounded font-bold bg-primary text-on-primary">{newModuleIds.length}</span>
+                            {showNew
+                                ? <ChevronDown class="w-4 h-4 text-content-muted ml-auto" />
+                                : <ChevronRight class="w-4 h-4 text-content-muted ml-auto" />
+                            }
+                        </button>
+                        {showNew && (
+                            <div class="divide-y-2 divide-edge">
+                                {contents.map(section => {
+                                    const sectionNew = section.modules.filter(m => newModuleIds.includes(m.id));
+                                    if (sectionNew.length === 0) return null;
+                                    return (
+                                        <div key={section.id}>
+                                            <div class="px-4 py-2 bg-page/50">
+                                                <span class="text-xs font-semibold text-content-muted">{section.name}</span>
+                                            </div>
+                                            {sectionNew.map(m => (
+                                                <a
+                                                    key={m.id}
+                                                    href={`${SCELE_URL}/mod/${m.modname}/view.php?id=${m.id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors"
+                                                >
+                                                    <span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-primary text-on-primary uppercase shrink-0">New</span>
+                                                    <span class="text-sm font-semibold text-content">{m.name}</span>
+                                                </a>
+                                            ))}
                                         </div>
-                                        {sectionNew.map(m => (
-                                            <a
-                                                key={m.id}
-                                                href={`${SCELE_URL}/mod/${m.modname}/view.php?id=${m.id}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors"
-                                            >
-                                                <span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-primary text-on-primary uppercase shrink-0">New</span>
-                                                <span class="text-sm font-semibold text-content">{m.name}</span>
-                                            </a>
-                                        ))}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {contents.length === 0 ? (
-                <div class="text-content-muted">No course content available</div>
-            ) : (
-                <>
-                    {/* Search and View Mode */}
-                    <div class="flex items-center justify-between gap-4 mb-6">
-                        <h2 class="text-lg font-bold text-content">Course Content</h2>
-                        <ViewModeSelector mode={viewMode} onChange={setViewMode} />
-                    </div>
-
-                    {/* Search Bar */}
-                    <div class="relative mb-4">
-                        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
-                        <input 
-                            type="text"
-                            placeholder="Search modules..."
-                            value={searchQuery}
-                            onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
-                            class="w-full pl-9 pr-3 py-2 rounded-lg text-sm border-2 transition-all focus:outline-none bg-page text-content border-edge focus:border-primary"
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={() => setSearchQuery("")}
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content"
-                            >
-                                ×
-                            </button>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
+                )}
 
-                    {searchQuery && (
-                        <div class="mb-4 text-sm text-content-muted">
-                            Found {filteredContents.reduce((acc, s) => acc + s.modules.length, 0)} modules
+                {contents.length > 0 && (
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="relative flex-1">
+                            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-content-muted" />
+                            <input
+                                type="text"
+                                placeholder="Search modules..."
+                                value={searchQuery}
+                                onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+                                class="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm border-2 transition-all focus:outline-none bg-page text-content border-edge focus:border-primary"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-muted hover:text-content"
+                                >×</button>
+                            )}
                         </div>
-                    )}
+                        <ViewModeSelector mode={viewMode} onChange={setViewMode} />
+                    </div>
+                )}
+            </div>
 
-                    {/* Content */}
-                    {viewMode === "chronological" ? (
-                        <ChronologicalView sections={filteredContents} newModuleIds={newModuleIds} />
-                    ) : (
-                        <GroupedView sections={filteredContents} newModuleIds={newModuleIds} />
-                    )}
-                </>
-            )}
+            {/* Scrollable content area */}
+            <div class="flex-1 min-h-0 px-4 lg:px-6 pb-3 overflow-hidden">
+                {contents.length === 0 ? (
+                    <div class="text-content-muted">No course content available</div>
+                ) : viewMode === "chronological" ? (
+                    <ChronologicalView sections={filteredContents} newModuleIds={newModuleIds} />
+                ) : viewMode === "grouped" ? (
+                    <GroupedView sections={filteredContents} newModuleIds={newModuleIds} />
+                ) : (
+                    <NewestView sections={filteredContents} newModuleIds={newModuleIds} />
+                )}
+            </div>
         </div>
     );
 };
