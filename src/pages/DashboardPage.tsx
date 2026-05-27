@@ -5,14 +5,26 @@ import { Tab } from "../types/state";
 import { CourseDetailTab } from "./CourseDetailPage";
 import { TasksTab } from "../helper/tabs";
 import { Course } from "../types/course";
-import { loadCourses, forceRefreshCourses } from "../stores/indexeddb/course";
-import { loadDeadlines, forceRefreshDeadlines } from "../stores/indexeddb/deadline";
+import { loadCourses } from "../stores/indexeddb/course";
+import { loadDeadlines } from "../stores/indexeddb/deadline";
 import { loadNotifications } from "../stores/indexeddb/notification";
-import { Deadline } from "../types/scele";
-import { AppNotification } from "../types/scele";
-import { Clock, Bell, AlertCircle, Pin, BookOpen, CheckCircle, MessageSquare, Calendar, Star, ChevronRight, FileText, Sparkles } from "lucide-preact";
+import { Deadline, AppNotification, Announcement } from "../types/scele";
+import { Clock, Bell, AlertCircle, Pin, BookOpen, CheckCircle, MessageSquare, Calendar, Star, ChevronRight, FileText, Sparkles, Megaphone } from "lucide-preact";
 import { pinnedCourses, togglePin, isPinned } from "../stores/pinned";
+import { wsToken } from "../stores/auth";
 import { getAllCachedNewModuleCounts } from "../stores/seenModules";
+import { loadAnnouncements } from "../stores/indexeddb/announcements";
+
+function parseLinks(html: string): { href: string; text: string }[] {
+    try {
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        return Array.from(doc.querySelectorAll("a[href]"))
+            .map(a => ({ href: (a as HTMLAnchorElement).href, text: a.textContent?.trim() ?? "" }))
+            .filter(({ href, text }) => href && text && !href.startsWith("javascript"));
+    } catch {
+        return [];
+    }
+}
 
 // Helper: get next deadline for a course
 function getNextDeadline(courseId: number, deadlines: Deadline[]): Deadline | null {
@@ -124,10 +136,8 @@ export default function DashboardPage() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [deadlines, setDeadlines] = useState<Deadline[]>([]);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [newModuleCounts, setNewModuleCounts] = useState<Record<string, number>>({});
-    const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
     // Stats
     const dueToday = deadlines.filter(d => {
@@ -148,79 +158,30 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const init = async () => {
-            console.log("Loading dashboard data...");
             try {
-                const [coursesResult, deadlinesResult, notificationsResult] = await Promise.all([
+                const [coursesResult, deadlinesResult, notificationsResult, announcementsResult] = await Promise.all([
                     loadCourses(),
                     loadDeadlines(),
                     loadNotifications(),
+                    loadAnnouncements(),
                 ]);
-                
-                // Merge pinned status from storage
+
                 const pinnedIds = new Set(pinnedCourses.value.map(c => c.id));
-                const coursesWithPinned = coursesResult.courses.map(c => ({
-                    ...c,
-                    isPinned: pinnedIds.has(c.id),
-                }));
-                
-                // Sort: pinned first
-                const sortedCourses = coursesWithPinned.sort((a, b) => {
-                    if (a.isPinned && !b.isPinned) return -1;
-                    if (!a.isPinned && b.isPinned) return 1;
-                    return 0;
-                });
-                
+                const sortedCourses = coursesResult.courses
+                    .map(c => ({ ...c, isPinned: pinnedIds.has(c.id) }))
+                    .sort((a, b) => (a.isPinned === b.isPinned ? 0 : a.isPinned ? -1 : 1));
+
                 setCourses(sortedCourses);
                 setDeadlines(deadlinesResult.deadlines);
                 setNotifications(notificationsResult.notifications);
+                setAnnouncements(announcementsResult.announcements);
 
-                // Load new module counts (courses with unseen modules)
                 const counts = await getAllCachedNewModuleCounts();
                 setNewModuleCounts(counts);
-            } catch (err: any) {
-                setError(err.message || "Failed to load dashboard.");
-            } finally {
-                setIsLoading(false);
-            }
+            } catch (_) {}
         };
         init();
     }, []);
-
-    const handleRefresh = async () => {
-        setIsRefreshing(true);
-        try {
-            const [coursesResult, deadlinesResult, notificationsResult] = await Promise.all([
-                forceRefreshCourses(),
-                forceRefreshDeadlines(),
-                loadNotifications(),
-            ]);
-            
-            // Merge pinned status from storage
-            const pinnedIds = new Set(pinnedCourses.value.map(c => c.id));
-            const coursesWithPinned = coursesResult.map(c => ({
-                ...c,
-                isPinned: pinnedIds.has(c.id),
-            }));
-            
-            // Sort: pinned first
-            const sortedCourses = coursesWithPinned.sort((a, b) => {
-                if (a.isPinned && !b.isPinned) return -1;
-                if (!a.isPinned && b.isPinned) return 1;
-                return 0;
-            });
-            
-            setCourses(sortedCourses);
-            setDeadlines(deadlinesResult);
-            setNotifications(notificationsResult.notifications);
-
-            const counts = await getAllCachedNewModuleCounts();
-            setNewModuleCounts(counts);
-        } catch (err: any) {
-            setError(err.message || "Failed to refresh.");
-        } finally {
-            setIsRefreshing(false);
-        }
-    };
 
     const formatDueDate = (timestamp: number) => {
         const date = new Date(timestamp);
@@ -430,88 +391,70 @@ export default function DashboardPage() {
 
                 {/* Right Column - Narrow */}
                 <div class="space-y-4">
-                    {/* Forums */}
+                    {/* Announcements */}
                     <div class="rounded-xl border-2 border-edge bg-page animate-fade-slide-up delay-3">
                         <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
                             <div class="flex items-center gap-2">
                                 <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
-                                    <MessageSquare class="w-4 h-4 text-on-primary" />
+                                    <Megaphone class="w-4 h-4 text-on-primary" />
                                 </div>
-                                <h3 class="font-semibold text-sm text-content">Forums</h3>
+                                <h3 class="font-semibold text-sm text-content">Announcements</h3>
                             </div>
-                            <span class="text-xs font-semibold px-2 py-1 rounded-lg bg-danger text-on-primary">
-                                {notifications.filter(n => n.module?.toLowerCase().includes('forum')).length} new
-                            </span>
-                        </div>
-                        <div class="divide-y-2 divide-edge">
-                            {notifications.filter(n => n.module?.toLowerCase().includes('forum')).slice(0, 3).map((forum) => (
-                                <div 
-                                    key={forum.id}
-                                    class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-page-secondary"
-                                    onClick={() => window.open(forum.url, "_blank")}
-                                >
-                                    <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-page-secondary">
-                                        <span class="text-sm font-bold text-content-muted">N</span>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="font-semibold text-sm text-content truncate">{forum.title}</p>
-                                        <p class="text-xs font-medium text-content-muted">{forum.module}</p>
-                                    </div>
-                                    {!forum.isRead && <span class="w-2 h-2 rounded-full bg-primary" />}
-                                </div>
-                            ))}
-                            {notifications.filter(n => n.module?.toLowerCase().includes('forum')).length === 0 && (
-                                <div class="px-4 py-6 text-center text-content-muted text-sm">
-                                    No new forums
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    
-                    {/* Notifications */}
-                    <div class="rounded-xl border-2 border-edge bg-page animate-fade-slide-up delay-4">
-                        <div class="flex items-center justify-between px-4 py-3 border-b-2 border-edge">
-                            <div class="flex items-center gap-2">
-                                <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-primary">
-                                    <Bell class="w-4 h-4 text-on-primary" />
-                                </div>
-                                <h3 class="font-semibold text-sm text-content">Notifications</h3>
-                            </div>
-                            {unreadNotifs > 0 && (
-                                <span class="text-xs font-semibold px-2 py-1 rounded-lg bg-danger text-on-primary">
-                                    {unreadNotifs} new
+                            {announcements.length > 0 && (
+                                <span class="text-xs font-semibold px-2 py-1 rounded-lg bg-edge text-content-muted">
+                                    {announcements.length}
                                 </span>
                             )}
                         </div>
                         <div class="divide-y-2 divide-edge">
-                            {notifications.slice(0, 5).map((notif) => (
-                                <div 
-                                    key={notif.id}
-                                    class="p-3 cursor-pointer hover:bg-page-secondary"
-                                    onClick={() => window.open(notif.url, "_blank")}
-                                >
-                                    <div class="flex items-start gap-3">
-                                        <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-primary/10">
-                                            <Bell class="w-5 h-5 text-primary" />
+                            {announcements.map((a) => {
+                                const token = wsToken.value ?? "";
+                                const items: { href: string; text: string }[] =
+                                    a.attachments.length > 0
+                                        ? a.attachments.slice(0, 3).map(f => ({ href: `${f.fileurl}?token=${token}`, text: f.filename }))
+                                        : parseLinks(a.message).slice(0, 3);
+                                return (
+                                    <div key={a.id} class="px-4 py-3 hover:bg-page-secondary cursor-pointer" onClick={() => window.open(a.url, "_blank")}>
+                                        <div class="flex items-start gap-3">
+                                            {a.userpictureurl ? (
+                                                <img src={a.userpictureurl} class="w-8 h-8 rounded-lg object-cover shrink-0 mt-0.5" />
+                                            ) : (
+                                                <div class="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <MessageSquare class="w-4 h-4 text-primary" />
+                                                </div>
+                                            )}
+                                            <div class="flex-1 min-w-0">
+                                                <p class="font-semibold text-sm text-content truncate leading-snug">{a.name}</p>
+                                                <p class="text-xs text-content-muted mt-0.5">
+                                                    {a.userfullname} · {new Date(a.timecreated * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                                </p>
+                                                {items.length > 0 && (
+                                                    <div class="flex flex-wrap gap-1 mt-1.5">
+                                                        {items.map((item, i) => (
+                                                            <a
+                                                                key={i}
+                                                                href={item.href}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors max-w-40 truncate"
+                                                            >
+                                                                <FileText class="w-3 h-3 shrink-0" />
+                                                                <span class="truncate">{item.text}</span>
+                                                            </a>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div class="flex-1 min-w-0">
-                                            <p class={`font-semibold text-sm ${notif.isRead ? 'text-content-muted' : 'text-content'}`}>
-                                                {notif.title}
-                                            </p>
-                                            <p class="text-xs font-medium text-content-muted mt-1">{notif.module}</p>
-                                        </div>
-                                        {!notif.isRead && <span class="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />}
                                     </div>
-                                </div>
-                            ))}
-                            {notifications.length === 0 && (
-                                <div class="px-4 py-6 text-center text-content-muted text-sm">
-                                    No notifications
-                                </div>
+                                );
+                            })}
+                            {announcements.length === 0 && (
+                                <div class="px-4 py-6 text-center text-content-muted text-sm">No announcements</div>
                             )}
                         </div>
                     </div>
-
                     
                 </div>
             </div>
