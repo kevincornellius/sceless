@@ -28,6 +28,7 @@ export default defineConfig({
 		keepProfileChanges: true,
 	},
 	manifest: {
+		name: "Sceless",
 		permissions: ["storage", "tabs"],
 		icons: {
 			16: "icon-16.png",
