@@ -1,6 +1,11 @@
 import { signal } from "@preact/signals";
 import { Course } from "@/src/types/course";
 import { db } from "./db";
+import { decodeEntities } from "@/src/utils/html";
+
+function sanitizeCourse(c: Course): Course {
+    return { ...c, title: decodeEntities(c.title), code: decodeEntities(c.code) };
+}
 
 const CACHE_KEY = "inprogress-courses";
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
@@ -56,9 +61,10 @@ export async function loadCourses(): Promise<{ courses: Course[]; isFromCache: b
     const cached = await getCachedCourses();
   
     if (cacheValid && cached && cached.length > 0) {
-        courses.value = cached;
+        const sanitized = cached.map(sanitizeCourse);
+        courses.value = sanitized;
         coursesLoaded.value = true;
-        return { courses: cached, isFromCache: true };
+        return { courses: sanitized, isFromCache: true };
     }
 
     const courseList = await refreshCourses();

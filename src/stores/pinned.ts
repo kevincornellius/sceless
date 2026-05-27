@@ -1,6 +1,7 @@
 import { storage } from "#imports";
 import { signal } from "@preact/signals";
 import type { Course } from "@/src/types/course";
+import { decodeEntities } from "@/src/utils/html";
 
 export const pinnedCourses = signal<Course[]>([]);
 export const pinnedCoursesLoaded = signal(false);
@@ -11,7 +12,11 @@ export const pinnedCoursesStorage = storage.defineItem<Course[]>("local:pinnedCo
 
 export const initPinnedCoursesStore = async () => {
     const saved = await pinnedCoursesStorage.getValue();
-    pinnedCourses.value = saved ?? [];
+    pinnedCourses.value = (saved ?? []).map(c => ({
+        ...c,
+        title: decodeEntities(c.title),
+        code: decodeEntities(c.code),
+    }));
     pinnedCoursesLoaded.value = true;
 };
 

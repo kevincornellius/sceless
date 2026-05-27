@@ -1,5 +1,6 @@
 import { Course, CourseSection } from "@/src/types/course";
 import { fetchMoodle } from "./fetch";
+import { decodeEntities } from "@/src/utils/html";
 
 export interface MoodleCourse {
     id: number;
@@ -40,8 +41,8 @@ export async function getInprogressCourses(): Promise<Course[]> {
 
     return data.courses.map(c => ({
         id: c.id,
-        title: c.fullname.replace(/^\[.*?\]\s*/, ""),
-        code: c.shortname,
+        title: decodeEntities(c.fullname.replace(/^\[.*?\]\s*/, "")),
+        code: decodeEntities(c.shortname),
         url: c.viewurl,
         progress: c.progress ?? 0,
         isPinned: c.isfavourite,

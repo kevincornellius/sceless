@@ -1,6 +1,6 @@
 {
 	"name": "sceless",
-	"description": "A modern, redesigned Client for SCELE (scele.cs.ui.ac.id) — the LMS of Computer Science, Universitas Indonesia.",
+	"description": "A modern, redesigned UI for SCELE (scele.cs.ui.ac.id) — the LMS of Computer Science, Universitas Indonesia.",
 	"private": true,
 	"version": "1.0.0",
 	"type": "module",

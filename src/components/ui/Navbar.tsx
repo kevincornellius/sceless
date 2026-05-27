@@ -194,12 +194,15 @@ function UserProfile({ profile }: UserProfileProps) {
     const handleLogout = async () => {
         await logout();
     };
+    const handleClearCache = async () => {
+        await db.clearFullDatabase();
+        window.location.reload();
+    };
     const handleClearData = async () => {
-        
         await db.clearFullDatabase();
         await browser.storage.local.clear();
         window.location.reload();
-    }
+    };
 
     return (
         <div 
@@ -261,6 +264,13 @@ function UserProfile({ profile }: UserProfileProps) {
                         >
                             <LogOut width={16} />
                             Logout
+                        </button>
+                        <button
+                            onClick={handleClearCache}
+                            class="w-full flex items-center cursor-pointer gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"
+                        >
+                            <Trash2Icon width={16} />
+                            Clear Cache
                         </button>
                         <button
                             onClick={handleClearData}
