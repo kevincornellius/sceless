@@ -50,52 +50,52 @@
 
 /* Prevent host-site utility classes (e.g. Bootstrap .bg-primary) from overriding extension theme colors */
 #sceless-root .bg-primary,
-#sceless-quiz-review-root .bg-primary {
+#sceless-quiz-review-root .bg-primary .bg-primary {
   background-color: var(--theme-primary) !important;
 }
 
 #sceless-root .text-primary,
-#sceless-quiz-review-root .text-primary {
+#sceless-quiz-review-root .text-primary .text-primary {
   color: var(--theme-primary) !important;
 }
 
 #sceless-root .border-primary,
-#sceless-quiz-review-root .border-primary {
+#sceless-quiz-review-root .border-primary .border-primary {
   border-color: var(--theme-primary) !important;
 }
 
 #sceless-root .text-on-primary,
-#sceless-quiz-review-root .text-on-primary {
+#sceless-quiz-review-root .text-on-primary .text-on-primary {
   color: var(--theme-on-primary) !important;
 }
 
 #sceless-root .bg-danger,
-#sceless-quiz-review-root .bg-danger {
+#sceless-quiz-review-root .bg-danger .bg-danger {
   background-color: var(--theme-danger) !important;
 }
 
 #sceless-root .text-danger,
-#sceless-quiz-review-root .text-danger {
+#sceless-quiz-review-root .text-danger .text-danger {
   color: var(--theme-danger) !important;
 }
 
 #sceless-root .border-danger,
-#sceless-quiz-review-root .border-danger {
+#sceless-quiz-review-root .border-danger .border-danger {
   border-color: var(--theme-danger) !important;
 }
 
 #sceless-root .bg-success,
-#sceless-quiz-review-root .bg-success {
+#sceless-quiz-review-root .bg-success .bg-success {
   background-color: var(--theme-success) !important;
 }
 
 #sceless-root .text-success,
-#sceless-quiz-review-root .text-success {
+#sceless-quiz-review-root .text-success .text-success {
   color: var(--theme-success) !important;
 }
 
 #sceless-root .border-success,
-#sceless-quiz-review-root .border-success {
+#sceless-quiz-review-root .border-success .border-success {
   border-color: var(--theme-success) !important;
 }
 

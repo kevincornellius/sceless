@@ -5,6 +5,7 @@ import TasksPage from "./pages/TasksPage";
 import SettingsPage from "./pages/SettingsPage";
 import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
+import AllCoursesPage from "./pages/AllCoursesPage";
 import { initializeTheme } from "./stores/theme";
 import { initNavigation, navigateTab, markBootComplete } from "./routing/router";
 import { initAuthStore, wsToken } from "./stores/auth";
@@ -34,6 +35,8 @@ const getPageFromActiveTabKey = (): ComponentChildren => {
 			return <TasksPage />;
 		case "settings":
 			return <SettingsPage />;
+		case "all-courses":
+			return <AllCoursesPage />;
 		default:
 			return <DashboardPage />;
 	}

@@ -115,10 +115,93 @@ input, select, textarea    { border-radius: 8px !important; }
 /* Links */
 a { color: var(--theme-primary, #58cc02) !important; }
 
-/* Primary buttons */
-.btn-primary {
+/* ── Buttons ─────────────────────────────────────────────────────── */
+
+/* Primary — use double-class for higher specificity than Bootstrap */
+.btn.btn-primary {
 	background-color: var(--theme-primary, #58cc02) !important;
 	border-color: var(--theme-primary, #58cc02) !important;
+	color: var(--theme-on-primary, #ffffff) !important;
+}
+.btn.btn-primary:hover,
+.btn.btn-primary:focus {
+	background-color: var(--theme-primary-dark, #46a302) !important;
+	border-color: var(--theme-primary-dark, #46a302) !important;
+	color: var(--theme-on-primary, #ffffff) !important;
+}
+
+/* Secondary / Default — page-secondary avoids blending into page bg in Noir/Paper */
+.btn.btn-secondary,
+.btn.btn-default {
+	background-color: var(--theme-page-secondary, #f7f7f7) !important;
+	border-color: var(--theme-edge, #e5e5e5) !important;
+	color: var(--theme-content, #3c3c3c) !important;
+}
+.btn.btn-secondary:hover,
+.btn.btn-secondary:focus,
+.btn.btn-default:hover,
+.btn.btn-default:focus {
+	background-color: var(--theme-edge, #e5e5e5) !important;
+	border-color: var(--theme-primary, #58cc02) !important;
+	color: var(--theme-content, #3c3c3c) !important;
+}
+
+/* Light — same as secondary */
+.btn.btn-light {
+	background-color: var(--theme-page-secondary, #f7f7f7) !important;
+	border-color: var(--theme-edge, #e5e5e5) !important;
+	color: var(--theme-content, #3c3c3c) !important;
+}
+
+/* Outline variants */
+.btn.btn-outline-primary {
+	border-color: var(--theme-primary, #58cc02) !important;
+	color: var(--theme-primary, #58cc02) !important;
+	background-color: transparent !important;
+}
+.btn.btn-outline-primary:hover,
+.btn.btn-outline-primary:focus {
+	background-color: var(--theme-primary, #58cc02) !important;
+	color: var(--theme-on-primary, #ffffff) !important;
+}
+.btn.btn-outline-secondary {
+	border-color: var(--theme-edge, #e5e5e5) !important;
+	color: var(--theme-content-muted, #afafaf) !important;
+	background-color: transparent !important;
+}
+.btn.btn-outline-secondary:hover,
+.btn.btn-outline-secondary:focus {
+	background-color: var(--theme-page-secondary, #f7f7f7) !important;
+	color: var(--theme-content, #3c3c3c) !important;
+}
+
+/* Link */
+.btn.btn-link {
+	color: var(--theme-primary, #58cc02) !important;
+	background-color: transparent !important;
+	border-color: transparent !important;
+}
+.btn.btn-link:hover {
+	color: var(--theme-primary-dark, #46a302) !important;
+}
+
+/* Semantic */
+.btn.btn-danger  { background-color: var(--theme-danger, #ff4b4b) !important; border-color: var(--theme-danger, #ff4b4b) !important; color: #ffffff !important; }
+.btn.btn-success { background-color: var(--theme-success, #58cc02) !important; border-color: var(--theme-success, #58cc02) !important; color: #ffffff !important; }
+.btn.btn-warning { background-color: var(--theme-highlight, #ffc800) !important; border-color: var(--theme-highlight, #ffc800) !important; color: #1a1a1a !important; }
+.btn.btn-info    { background-color: var(--theme-primary, #58cc02) !important; border-color: var(--theme-primary, #58cc02) !important; color: var(--theme-on-primary, #ffffff) !important; }
+
+/* Disabled */
+.btn:disabled,
+.btn.disabled {
+	opacity: 0.45 !important;
+	cursor: not-allowed !important;
+}
+
+/* Focus ring */
+.btn:focus {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme-primary, #58cc02) 25%, transparent) !important;
+	outline: none !important;
 }
 
 /* ── Navbar ─────────────────────────────────────────────────────── */
@@ -212,6 +295,24 @@ a { color: var(--theme-primary, #58cc02) !important; }
 	background: var(--theme-content-muted, #afafaf);
 }
 
+/* Footer / server clock */
+#page-footer,
+#page-footer *,
+.servertime,
+.footer,
+.footer * {
+	color: var(--theme-content-muted, #afafaf) !important;
+	background-color: transparent !important;
+}
+
+/* Moodle block_progress server time input */
+input.clock,
+#block_progress_serverTime {
+	color: var(--theme-content, #3c3c3c) !important;
+	background-color: transparent !important;
+	border: none !important;
+}
+
 /* Preserve Moodle's original text color inside status-tinted cells */
 .generaltable td[class*="overdue"],
 .generaltable td[class*="overdue"] *,
@@ -287,7 +388,11 @@ function injectNavbarMods() {
 }
 
 export default defineContentScript({
-	matches: ["*://scele.cs.ui.ac.id/mod/**"],
+	matches: [
+		"*://scele.cs.ui.ac.id/mod/**",
+		"*://scele.cs.ui.ac.id/course/**",
+		"*://scele.cs.ui.ac.id/enrol/**",
+	],
 	excludeMatches: ["*://scele.cs.ui.ac.id/mod/quiz/review.php*"],
 	runAt: "document_end",
 	cssInjectionMode: "manual",

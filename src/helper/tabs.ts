@@ -2,6 +2,7 @@ import { SCELE_URL } from "../config";
 import { CourseDetailTab } from "../pages/CourseDetailPage";
 import { DashboardTab } from "../pages/DashboardPage";
 import { SettingsTab } from "../pages/SettingsPage";
+import { AllCoursesTab } from "../pages/AllCoursesPage";
 import { Tab } from "../types/state";
 import { getCourseCode } from "../stores/indexeddb/course";
 
@@ -34,6 +35,8 @@ export function TabToUrl(tab: Tab): string {
 				return "my";
 			case "settings":
 				return "user/preferences.php";
+			case "all-courses":
+				return "course/index.php";
 		}
 	};
 
@@ -67,6 +70,10 @@ export function UrlToTab(urlString: string): Tab | null {
 
 		if (path === "/user/preferences.php") {
 			return SettingsTab;
+		}
+
+		if (path === "/course/index.php") {
+			return AllCoursesTab;
 		}
 
 		if (path === "/mod/forum/view.php") {

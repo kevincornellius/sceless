@@ -4,6 +4,7 @@ import { navigateTab } from "../routing/router";
 import { Tab } from "../types/state";
 import { CourseDetailTab } from "./CourseDetailPage";
 import { TasksTab } from "../helper/tabs";
+import { AllCoursesTab } from "./AllCoursesPage";
 import { Course } from "../types/course";
 import { loadCourses } from "../stores/indexeddb/course";
 import { loadDeadlines } from "../stores/indexeddb/deadline";
@@ -368,6 +369,12 @@ export default function DashboardPage() {
                                         <span class="text-xs px-2 py-0.5 rounded-lg font-semibold bg-edge text-content-muted">
                                             {courses.filter(c => !isPinned(c.id)).length}
                                         </span>
+                                        <button
+                                            onClick={() => navigateTab(AllCoursesTab)}
+                                            class="ml-auto text-xs font-semibold text-primary hover:underline"
+                                        >
+                                            View All Courses
+                                        </button>
                                     </div>
                                     <div class="space-y-2 overflow-y-auto scrollbar-thin max-h-[55vh] pr-1">
                                         {courses.filter(c => !isPinned(c.id)).map((course, i) => (
