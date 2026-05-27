@@ -6,17 +6,14 @@ import {
 	FileText,
 	ClipboardList,
 	MessageSquare,
-	Video,
-	Download,
 	Link,
 	PlayCircle,
 	Folder,
 	Lock,
 	HelpCircle,
 	FileQuestion,
-	AlertCircle,
-	CheckCircle,
-	Clock,
+	Check,
+	Info,
 } from "lucide-preact";
 import { SCELE_URL } from "../../config";
 import { CourseSection, CourseModule, getModuleDueDate, formatDueDate } from "../../types/course";
@@ -52,12 +49,10 @@ const moduleTypeLabels: Record<string, string> = {
 	label: "Labels",
 };
 
-// Get icon for module type
 function getModuleIcon(modname: string) {
 	return moduleIcons[modname.toLowerCase()] || FileText;
 }
 
-// Get label for module type
 function getModuleTypeLabel(modname: string) {
 	return moduleTypeLabels[modname.toLowerCase()] || modname;
 }
@@ -105,15 +100,12 @@ function replaceImagesWithPlaceholder(html: string): string {
 
 // Chronological View — always expanded (like normal Moodle)
 export function ChronologicalView({ sections, newModuleIds = [] }: { sections: CourseSection[]; newModuleIds?: number[] }) {
-	// Filter out invisible sections
-	const visibleSections = sections.filter((s) => s.visible);
+	const visibleSections = sections.filter((s) => s.visible && s.uservisible !== false);
 	const scrollRef = useRef<HTMLDivElement>(null);
 
-	// Scroll to #section-N on mount if hash is present
 	useEffect(() => {
 		const hash = window.location.hash;
 		if (hash && hash.startsWith("#section-")) {
-			// section.section is the sequential number (e.g. 5 in #section-5)
 			const el = scrollRef.current?.querySelector(hash);
 			if (el) {
 				setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
@@ -121,7 +113,6 @@ export function ChronologicalView({ sections, newModuleIds = [] }: { sections: C
 		}
 	}, []);
 
-	// Event delegation: intercept anchor clicks in injected HTML for hash navigation
 	const handleContainerClick = (e: MouseEvent) => {
 		const target = (e.target as HTMLElement).closest("a");
 		if (!target) return;
@@ -129,23 +120,20 @@ export function ChronologicalView({ sections, newModuleIds = [] }: { sections: C
 		const href = target.getAttribute("href");
 		if (!href) return;
 
-		// Hash navigation within the page (e.g. href="#section-5")
 		if (href.startsWith("#section-")) {
 			e.preventDefault();
 			const el = scrollRef.current?.querySelector(href);
 			if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 			return;
 		}
-
-		// External/other links: let browser handle them normally
 	};
 
 	return (
 		<div ref={scrollRef} class="space-y-3" onClick={handleContainerClick}>
 			{visibleSections.map((section) => {
-				// Filter visible modules
 				const visibleModules = section.modules.filter((m) => m.visible);
-				const moduleCount = visibleModules.length;
+				const moduleCount = visibleModules.filter((m) => m.uservisible !== false).length;
+				const restrictedCount = visibleModules.filter((m) => m.uservisible === false).length;
 				const cleanSummary = replaceImagesWithPlaceholder(section.summary || "");
 
 				return (
@@ -158,18 +146,23 @@ export function ChronologicalView({ sections, newModuleIds = [] }: { sections: C
 										{moduleCount} items
 									</span>
 								)}
+								{restrictedCount > 0 && (
+									<span class="text-xs px-2 py-0.5 rounded font-semibold bg-edge text-content-muted flex items-center gap-1">
+										<Lock class="w-3 h-3" />
+										{restrictedCount}
+									</span>
+								)}
 							</div>
 						</div>
 
 						<div class="divide-y-2 divide-edge">
-							{/* Summary — images replaced with placeholder (require auth token) */}
 							{cleanSummary && (
 								<div
 									class="px-4 py-3 text-sm text-content-muted bg-page/50 [&_a]:text-primary [&_a]:underline"
 									dangerouslySetInnerHTML={{ __html: cleanSummary }}
 								/>
 							)}
-							{moduleCount === 0 && !cleanSummary ? (
+							{visibleModules.length === 0 && !cleanSummary ? (
 								<div class="px-4 py-6 text-center text-sm text-content-muted">
 									No content in this section
 								</div>
@@ -188,10 +181,9 @@ export function ChronologicalView({ sections, newModuleIds = [] }: { sections: C
 
 // Grouped View
 export function GroupedView({ sections, newModuleIds = [] }: { sections: CourseSection[]; newModuleIds?: number[] }) {
-	// Get unique types from sections
 	const uniqueTypes = [...new Set(
 		sections
-			.filter((s) => s.visible)
+			.filter((s) => s.visible && s.uservisible !== false)
 			.flatMap((s) => s.modules.filter((m) => m.visible).map((m) => m.modname.toLowerCase()))
 	)];
 
@@ -201,11 +193,10 @@ export function GroupedView({ sections, newModuleIds = [] }: { sections: CourseS
 		setExpandedTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
 	};
 
-	// Flatten and group modules by type
 	const modulesByType: Record<string, { module: CourseModule; sectionName: string }[]> = {};
 
 	sections
-		.filter((s) => s.visible)
+		.filter((s) => s.visible && s.uservisible !== false)
 		.forEach((section) => {
 			section.modules
 				.filter((m) => m.visible)
@@ -226,7 +217,6 @@ export function GroupedView({ sections, newModuleIds = [] }: { sections: CourseS
 		count: items.length,
 	}));
 
-	// Sort by type priority
 	const typeOrder = ["resource", "folder", "page", "assign", "quiz", "forum", "lesson", "choice", "url", "book", "imscp", "label"];
 	typeInfoList.sort((a, b) => {
 		const aIndex = typeOrder.indexOf(a.type);
@@ -287,15 +277,21 @@ function ModuleItem({
 	sectionName?: string;
 	isNew?: boolean;
 }) {
+	const [showDesc, setShowDesc] = useState(false);
 	const Icon = getModuleIcon(module.modname);
-	const modUrl = `${SCELE_URL}/mod/${module.modname}/view.php?id=${module.id}`;
+	const isRestricted = module.uservisible === false;
+	const hasCompletion = module.completiondata?.hascompletion;
+	const isCompleted = hasCompletion && module.completiondata!.state === 1;
+	const indentClass = (module.indent ?? 0) > 0 ? "pl-10" : "";
 	const dueDate = getModuleDueDate(module);
 	const isOverdue = dueDate && dueDate < new Date();
+	const modUrl = module.url || `${SCELE_URL}/mod/${module.modname}/view.php?id=${module.id}`;
+	const cleanDesc = module.description ? replaceImagesWithPlaceholder(module.description) : null;
 
 	// Labels render their HTML content inline — no clickable link
 	if (module.modname.toLowerCase() === "label") {
 		return (
-			<div class="px-4 py-3 border-b-2 border-edge last:border-b-0">
+			<div class={`px-4 py-3 border-b-2 border-edge last:border-b-0 ${indentClass}`}>
 				<div
 					class="text-sm text-content [&_h3]:font-bold [&_h3]:mb-2 [&_p]:mb-2 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline"
 					dangerouslySetInnerHTML={{ __html: module.description || "" }}
@@ -305,34 +301,84 @@ function ModuleItem({
 	}
 
 	return (
-		<a
-			href={modUrl}
-			target="_blank"
-			rel="noopener noreferrer"
-			class="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors cursor-pointer"
-		>
-			<div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-page">
-				<Icon class="w-5 h-5 text-content-muted" />
-			</div>
-			<div class="flex-1 min-w-0">
-				<div class="flex items-center gap-2">
-					<p class="font-semibold text-sm text-content truncate">{module.name}</p>
-					{isNew && (
-						<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded font-bold bg-primary text-on-primary uppercase">
-							New
+		<div class={`${indentClass}`}>
+			<a
+				href={modUrl}
+				target="_blank"
+				rel="noopener noreferrer"
+				class={`flex items-start gap-3 px-4 py-3 transition-colors ${
+					isRestricted
+						? "opacity-60 cursor-default pointer-events-none"
+						: "hover:bg-primary/5 cursor-pointer"
+				}`}
+				onClick={isRestricted ? (e) => e.preventDefault() : undefined}
+			>
+				{/* Icon with completion state */}
+				<div class={`relative w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
+					isCompleted ? "bg-primary/15" : "bg-page"
+				}`}>
+					<Icon class={`w-5 h-5 ${isCompleted ? "text-primary" : "text-content-muted"}`} />
+					{isCompleted && (
+						<span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+							<Check class="w-2.5 h-2.5 text-on-primary" strokeWidth={3} />
 						</span>
 					)}
 				</div>
-				<p class="text-xs font-medium text-content-muted">{getModuleTypeLabel(module.modname)}{showSection && sectionName ? ` · ${sectionName}` : ""}</p>
-			</div>
-			{dueDate && (
-				<span class={`text-xs px-2 py-1 rounded-lg font-semibold flex-shrink-0 ${isOverdue ? "bg-danger text-white" : "bg-primary/20 text-primary"}`}>
-					{formatDueDate(dueDate)}
-				</span>
-			)}
-			{module.availability && module.availability.includes("unavailable") && (
-				<Lock class="w-4 h-4 text-content-muted flex-shrink-0" />
-			)}
-		</a>
+
+				{/* Content */}
+				<div class="flex-1 min-w-0">
+					<div class="flex items-center gap-2 flex-wrap">
+						<p class="font-semibold text-sm text-content truncate">{module.name}</p>
+						{isNew && (
+							<span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded font-bold bg-primary text-on-primary uppercase">
+								New
+							</span>
+						)}
+					</div>
+					<div class="flex items-center gap-2 mt-0.5 flex-wrap">
+						<p class="text-xs font-medium text-content-muted">
+							{getModuleTypeLabel(module.modname)}{showSection && sectionName ? ` · ${sectionName}` : ""}
+						</p>
+						{cleanDesc && !isRestricted && (
+							<button
+								onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowDesc(v => !v); }}
+								class="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-0.5 pointer-events-auto"
+							>
+								<Info class="w-3 h-3" />
+								{showDesc ? "less" : "info"}
+							</button>
+						)}
+					</div>
+
+					{/* Expandable description */}
+					{showDesc && cleanDesc && (
+						<div
+							class="mt-2 p-3 rounded-lg bg-page text-sm text-content [&_a]:text-primary [&_a]:underline [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-1.5 [&_strong]:font-semibold [&_h3]:font-bold [&_h3]:mb-1 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_li]:mb-0.5"
+							dangerouslySetInnerHTML={{ __html: cleanDesc }}
+						/>
+					)}
+
+					{/* Availability restriction info */}
+					{isRestricted && module.availabilityinfo && (
+						<div
+							class="mt-1 text-xs text-content-muted [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-3 [&_li]:mt-0.5"
+							dangerouslySetInnerHTML={{ __html: module.availabilityinfo }}
+						/>
+					)}
+				</div>
+
+				{/* Due date */}
+				{dueDate && !isRestricted && (
+					<span class={`text-xs px-2 py-1 rounded-lg font-semibold flex-shrink-0 self-center ${
+						isOverdue ? "bg-danger text-white" : "bg-primary/20 text-primary"
+					}`}>
+						{formatDueDate(dueDate)}
+					</span>
+				)}
+
+				{/* Lock icon for restricted modules */}
+				{isRestricted && <Lock class="w-4 h-4 text-content-muted flex-shrink-0 self-center" />}
+			</a>
+		</div>
 	);
 }

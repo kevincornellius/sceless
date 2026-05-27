@@ -13,28 +13,52 @@ export interface CourseSection {
     id: number;
     name: string;
     visible: number;
+    uservisible?: boolean;
+    hiddenbynumsections?: number;
     summary: string;
     summaryformat: number;
     section: number;
     modules: CourseModule[];
 }
 
+export interface CompletionDetail {
+    rulename: string;
+    rulevalue: { status: number; description: string };
+}
+
+export interface CompletionData {
+    state: number;
+    timecompleted: number;
+    hascompletion: boolean;
+    isautomatic: boolean;
+    istrackeduser?: boolean;
+    uservisible?: boolean;
+    details: CompletionDetail[];
+}
+
 export interface CourseModule {
     id: number;
+    url?: string;
     name: string;
     instance: number;
     description?: string;
     visible: number;
+    uservisible?: boolean;
+    availabilityinfo?: string;
+    visibleoncoursepage?: number;
     modname: string;
     modplural: string;
-    availability?: string;
+    indent?: number;
+    noviewlink?: boolean;
     customdata?: string;
+    completiondata?: CompletionData;
+    dates?: { label: string; timestamp: number }[];
     contents?: ModuleContent[];
     contentsinfo?: {
         filescount: number;
         filessize: number;
         lastmodified: number;
-        mimemimetype: string;
+        mimetypes?: string[];
         repositorytype?: string;
     };
 }
