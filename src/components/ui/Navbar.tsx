@@ -14,11 +14,12 @@ export const closeAllDropdowns = () => {
 };
 import type { Profile as ProfileType } from "@/src/types/profile";
 import type { AppNotification } from "@/src/types/scele";
-import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon } from "lucide-preact";
+import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon, Settings } from "lucide-preact";
 import { logout } from "@/src/stores/auth";
 import { theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes, type ThemeConfig } from "@/src/types/themes";
 import { CourseDetailTab } from "@/src/pages/CourseDetailPage";
+import { SettingsTab } from "@/src/pages/SettingsPage";
 import { navigateTab } from "@/src/routing/router";
 import { db } from "@/src/stores/indexeddb/db";
 
@@ -246,6 +247,14 @@ function UserProfile({ profile }: UserProfileProps) {
 
                     {/* Actions */}
                     <div class="py-1">
+                        <button
+                            onClick={() => { setIsOpen(false); navigateTab(SettingsTab); }}
+                            class="w-full flex items-center cursor-pointer gap-2 px-3 py-2 text-sm text-content hover:bg-page-secondary transition-colors"
+                        >
+                            <Settings width={16} />
+                            Settings
+                        </button>
+                        <div class="border-t border-edge my-1" />
                         <button
                             onClick={handleLogout}
                             class="w-full flex items-center cursor-pointer gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/10 transition-colors"

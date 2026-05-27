@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { Layout } from "./components/Layout";
 import DashboardPage, { DashboardTab } from "./pages/DashboardPage";
 import TasksPage from "./pages/TasksPage";
+import SettingsPage from "./pages/SettingsPage";
 import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
 import { initializeTheme } from "./stores/theme";
@@ -31,6 +32,8 @@ const getPageFromActiveTabKey = (): ComponentChildren => {
 			return <CourseDetailPage courseId={id} />;
 		case "tasks":
 			return <TasksPage />;
+		case "settings":
+			return <SettingsPage />;
 		default:
 			return <DashboardPage />;
 	}

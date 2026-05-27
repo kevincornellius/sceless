@@ -1,6 +1,7 @@
 import { SCELE_URL } from "../config";
 import { CourseDetailTab } from "../pages/CourseDetailPage";
 import { DashboardTab } from "../pages/DashboardPage";
+import { SettingsTab } from "../pages/SettingsPage";
 import { Tab } from "../types/state";
 import { getCourseCode } from "../stores/indexeddb/course";
 
@@ -27,10 +28,12 @@ export function TabToUrl(tab: Tab): string {
 				return "";
 			case "course":
 				return `course/view.php?id=${tab.id}`;
-				case "quiz-review":
-					return `mod/quiz/review.php?attempt=${tab.id}`;
+			case "quiz-review":
+				return `mod/quiz/review.php?attempt=${tab.id}`;
 			case "tasks":
 				return "my";
+			case "settings":
+				return "user/preferences.php";
 		}
 	};
 
@@ -60,6 +63,10 @@ export function UrlToTab(urlString: string): Tab | null {
 			const attemptId = url.searchParams.get("attempt");
 			if (!attemptId || !Number.isFinite(Number(attemptId))) return DashboardTab;
 			return QuizReviewTab(String(Number(attemptId)));
+		}
+
+		if (path === "/user/preferences.php") {
+			return SettingsTab;
 		}
 
 		if (path === "/mod/forum/view.php") {
