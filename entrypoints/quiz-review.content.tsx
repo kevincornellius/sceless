@@ -986,6 +986,29 @@ function ensureStyles() {
 			page-break-inside: avoid;
 		}
 	}
+
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--theme-edge, #e5e5e5) transparent;
+	}
+
+	*::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+
+	*::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	*::-webkit-scrollbar-thumb {
+		background: var(--theme-edge, #e5e5e5);
+		border-radius: 3px;
+	}
+
+	*::-webkit-scrollbar-thumb:hover {
+		background: var(--theme-content-muted, #afafaf);
+	}
 	`;
 
 	document.head.appendChild(styleElement);
@@ -1015,6 +1038,13 @@ export default defineContentScript({
 	cssInjectionMode: "manual",
 
 	async main() {
+		const url = new URL(window.location.href);
+		if (url.searchParams.get("showall") !== "1") {
+			url.searchParams.set("showall", "1");
+			window.location.replace(url.toString());
+			return;
+		}
+
 		const hijackEnabled =
 			(await quizReviewHijackStorage.getValue()) ?? true;
 
