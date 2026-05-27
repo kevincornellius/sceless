@@ -14,10 +14,8 @@ export const initAuthStore = async () => {
 };
 
 export const saveToken = async (newToken: string) => {
-    await tokenStorage.setValue(newToken); 
-    const check = await tokenStorage.getValue();
-    console.log("Saved token:", newToken, "Verified token from storage:", check);
-    wsToken.value = newToken; 
+    await tokenStorage.setValue(newToken);
+    wsToken.value = newToken;
 };
 
 export const logout = async () => {
