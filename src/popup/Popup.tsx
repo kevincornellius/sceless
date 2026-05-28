@@ -144,6 +144,15 @@ export function Popup() {
 					Reload the tab after changing toggles.
 				</p>
 			)}
+
+			<div class="border-t pt-3">
+				<button
+					onClick={() => browser.tabs.create({ url: browser.runtime.getURL("/wrapped.html") })}
+					class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+				>
+					Semester Wrapped
+				</button>
+			</div>
 		</div>
 	);
 }
