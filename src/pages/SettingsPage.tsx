@@ -1,8 +1,10 @@
 import { useState, useEffect } from "preact/hooks";
-import { quizReviewHijackStorage, enabledStorage } from "../storage";
-import { LogoL } from "../components/ui/Logo";
+import { quizReviewHijackStorage, enabledStorage, sceleModStorage } from "../storage";
 import { SCELE_URL } from "../config";
 import { Tab } from "../types/state";
+import { loadSiteInfo } from "../stores/indexeddb/siteinfo";
+import { Profile } from "../types/profile";
+import { ExternalLink, User } from "lucide-preact";
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
     return (
@@ -46,14 +48,18 @@ function SettingRow({
 }
 
 export default function SettingsPage() {
-    const [version, setVersion] = useState("");
+    const [version,   setVersion]   = useState("");
     const [quizReview, setQuizReview] = useState(true);
-    const [enabled, setEnabled] = useState(true);
+    const [enabled,   setEnabled]   = useState(true);
+    const [sceleMod,  setSceleMod]  = useState(true);
+    const [profile,   setProfile]   = useState<Profile | null>(null);
 
     useEffect(() => {
         setVersion(browser.runtime.getManifest().version);
         quizReviewHijackStorage.getValue().then((v) => setQuizReview(v ?? true));
         enabledStorage.getValue().then((v) => setEnabled(v ?? true));
+        sceleModStorage.getValue().then((v) => setSceleMod(v ?? true));
+        loadSiteInfo().then(({ info }) => setProfile(info));
     }, []);
 
     const handleQuizReview = async (v: boolean) => {
@@ -64,6 +70,11 @@ export default function SettingsPage() {
     const handleEnabled = async (v: boolean) => {
         setEnabled(v);
         await enabledStorage.setValue(v);
+    };
+
+    const handleSceleMod = async (v: boolean) => {
+        setSceleMod(v);
+        await sceleModStorage.setValue(v);
     };
 
     return (
@@ -77,6 +88,47 @@ export default function SettingsPage() {
             </div>
 
             <div class="max-w-2xl space-y-4">
+                {/* Profile */}
+                <div class="rounded-xl border-2 border-edge bg-page">
+                    <div class="px-4 pt-4 pb-2 border-b border-edge">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-content-muted">Account</h2>
+                    </div>
+                    <div class="px-4 py-4">
+                        {profile ? (
+                            <div class="flex items-center gap-4">
+                                {profile.pictureurl ? (
+                                    <img src={profile.pictureurl} class="w-14 h-14 rounded-full object-cover shrink-0 border-2 border-edge" />
+                                ) : (
+                                    <div class="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center shrink-0 border-2 border-edge">
+                                        <User class="w-7 h-7 text-primary" />
+                                    </div>
+                                )}
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-bold text-content truncate">{profile.name}</p>
+                                    <p class="text-xs text-content-muted truncate">@{profile.username}</p>
+                                    <p class="text-xs text-content-muted mt-0.5">ID: {profile.id}</p>
+                                </div>
+                                <a
+                                    href={`${SCELE_URL}/user/profile.php?id=${profile.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="p-2 rounded-lg hover:bg-edge transition-colors text-content-muted hover:text-content shrink-0"
+                                    title="Open profile on SCELE"
+                                >
+                                    <ExternalLink class="w-4 h-4" />
+                                </a>
+                            </div>
+                        ) : (
+                            <div class="flex items-center gap-3">
+                                <div class="w-14 h-14 rounded-full bg-edge animate-pulse shrink-0" />
+                                <div class="space-y-2 flex-1">
+                                    <div class="h-3 bg-edge rounded animate-pulse w-32" />
+                                    <div class="h-3 bg-edge rounded animate-pulse w-20" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
                 {/* General */}
                 <div class="rounded-xl border-2 border-edge bg-page">
                     <div class="px-4 pt-4 pb-2 border-b border-edge">
@@ -98,6 +150,12 @@ export default function SettingsPage() {
                         <h2 class="text-xs font-bold uppercase tracking-wider text-content-muted">Features</h2>
                     </div>
                     <div class="px-4">
+                        <SettingRow
+                            label="Stylized SCELE Native Pages"
+                            description="Apply Sceless fonts, colors, and theme to native SCELE pages (course, mod, user profile, etc.)."
+                            checked={sceleMod}
+                            onChange={handleSceleMod}
+                        />
                         <SettingRow
                             label="Quiz Review"
                             description="Replace the quiz review page with Sceless's custom layout for better readability and print support."

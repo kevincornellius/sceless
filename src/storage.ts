@@ -10,3 +10,10 @@ export const quizReviewHijackStorage = storage.defineItem<boolean>(
 		defaultValue: true,
 	},
 );
+
+export const sceleModStorage = storage.defineItem<boolean>(
+	"local:sceleModEnabled",
+	{
+		defaultValue: true,
+	},
+);

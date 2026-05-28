@@ -8,7 +8,8 @@ import { CourseDetailTab } from "./CourseDetailPage";
 import { getUserId } from "../stores/indexeddb/siteinfo";
 import { wsToken } from "../stores/auth";
 import { pinnedCourses, togglePin } from "../stores/pinned";
-import { FolderOpen, BookOpen, ExternalLink, Pin } from "lucide-preact";
+import { db } from "../stores/indexeddb/db";
+import { FolderOpen, BookOpen, ExternalLink, Pin, RefreshCw } from "lucide-preact";
 
 export const AllCoursesTab: Tab = {
 	type: "all-courses",
@@ -47,6 +48,9 @@ interface Category {
 	visible: number;
 }
 
+const CACHE_KEY_COURSES = "all-enrolled-courses";
+const CACHE_KEY_CATS    = "all-categories";
+
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
 function courseImageUrl(files?: MoodleEnrolledCourse["overviewfiles"]): string | undefined {
@@ -77,6 +81,30 @@ async function fetchCategories(): Promise<Category[]> {
 	const data = await fetchMoodle<Category[]>("core_course_get_categories");
 	if (!data) return [];
 	return data.filter((c) => c.visible !== 0);
+}
+
+async function loadCourses(): Promise<CourseEntry[]> {
+	const cached = await db.get<CourseEntry[]>("cache", CACHE_KEY_COURSES);
+	if (cached && cached.length > 0) return cached;
+	const fresh = await fetchEnrolledCourses();
+	await db.set("cache", CACHE_KEY_COURSES, fresh);
+	return fresh;
+}
+
+async function loadCategories(): Promise<Category[]> {
+	const cached = await db.get<Category[]>("cache", CACHE_KEY_CATS);
+	if (cached && cached.length > 0) return cached;
+	const fresh = await fetchCategories();
+	await db.set("cache", CACHE_KEY_CATS, fresh);
+	return fresh;
+}
+
+async function refreshAll(): Promise<{ courses: CourseEntry[]; categories: Category[] }> {
+	const [courses, categories] = await Promise.all([
+		fetchEnrolledCourses().then(async (d) => { await db.set("cache", CACHE_KEY_COURSES, d); return d; }),
+		fetchCategories().then(async (d) => { await db.set("cache", CACHE_KEY_CATS, d); return d; }),
+	]);
+	return { courses, categories };
 }
 
 // ── Components ────────────────────────────────────────────────────────────────
@@ -162,24 +190,28 @@ function CategoryCard({ cat }: { cat: Category }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 const AllCoursesPage = () => {
-	const [loadingCourses, setLoadingCourses] = useState(true);
-	const [loadingCats, setLoadingCats] = useState(true);
-	const [courses, setCourses] = useState<CourseEntry[]>([]);
+	const [loading,    setLoading]    = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
+	const [courses,    setCourses]    = useState<CourseEntry[]>([]);
 	const [categories, setCategories] = useState<Category[]>([]);
 
 	useEffect(() => {
-		fetchEnrolledCourses()
-			.then(setCourses)
-			.finally(() => setLoadingCourses(false));
-		fetchCategories()
-			.then(setCategories)
-			.finally(() => setLoadingCats(false));
+		Promise.all([loadCourses(), loadCategories()])
+			.then(([c, cats]) => { setCourses(c); setCategories(cats); })
+			.finally(() => setLoading(false));
 	}, []);
 
+	const handleRefresh = () => {
+		setRefreshing(true);
+		refreshAll()
+			.then(({ courses: c, categories: cats }) => { setCourses(c); setCategories(cats); })
+			.finally(() => setRefreshing(false));
+	};
+
 	const activeCourses = courses.filter((c) => !c.isPast);
-	const pastCourses = courses.filter((c) => c.isPast);
-	const topLevel = categories.filter((c) => c.parent === 0);
-	const subCats = categories.filter((c) => c.parent !== 0);
+	const pastCourses   = courses.filter((c) => c.isPast);
+	const topLevel      = categories.filter((c) => c.parent === 0);
+	const subCats       = categories.filter((c) => c.parent !== 0);
 
 	return (
 		<div class="p-5 h-full overflow-y-auto scrollbar-thin space-y-7">
@@ -189,14 +221,22 @@ const AllCoursesPage = () => {
 				<div class="flex items-center gap-2 mb-3">
 					<BookOpen class="w-4 h-4 text-primary" />
 					<h2 class="text-sm font-bold text-content">My Enrolled Courses</h2>
-					{!loadingCourses && (
+					{!loading && (
 						<span class="text-xs px-2 py-0.5 rounded-lg font-semibold bg-edge text-content-muted">
 							{courses.length}
 						</span>
 					)}
+					<button
+						onClick={handleRefresh}
+						disabled={refreshing}
+						class="ml-auto p-1.5 rounded-lg hover:bg-edge transition-colors cursor-pointer disabled:opacity-50"
+						title="Refresh"
+					>
+						<RefreshCw class={`w-3.5 h-3.5 text-content-muted ${refreshing ? "animate-spin" : ""}`} />
+					</button>
 				</div>
 
-				{loadingCourses ? (
+				{loading ? (
 					<p class="text-xs text-content-muted">Loading…</p>
 				) : courses.length === 0 ? (
 					<p class="text-xs text-content-muted">No enrolled courses found.</p>
@@ -230,7 +270,7 @@ const AllCoursesPage = () => {
 					<h2 class="text-sm font-bold text-content">Browse by Category</h2>
 				</div>
 
-				{loadingCats ? (
+				{loading ? (
 					<p class="text-xs text-content-muted">Loading…</p>
 				) : categories.length === 0 ? (
 					<p class="text-xs text-content-muted">No categories found.</p>

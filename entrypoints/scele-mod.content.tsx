@@ -2,6 +2,7 @@ import { h, render as renderPreact } from "preact";
 import { Logo } from "@/src/components/ui/Logo";
 import { initializeTheme, theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes } from "@/src/types/themes";
+import { sceleModStorage } from "@/src/storage";
 
 const STYLE_ID = "sceless-mod-style";
 const FONT_ID = "sceless-mod-font";
@@ -392,12 +393,16 @@ export default defineContentScript({
 		"*://scele.cs.ui.ac.id/mod/**",
 		"*://scele.cs.ui.ac.id/course/**",
 		"*://scele.cs.ui.ac.id/enrol/**",
+		"*://scele.cs.ui.ac.id/user/**",
 	],
 	excludeMatches: ["*://scele.cs.ui.ac.id/mod/quiz/review.php*"],
 	runAt: "document_end",
 	cssInjectionMode: "manual",
 
 	async main() {
+		const enabled = (await sceleModStorage.getValue()) ?? true;
+		if (!enabled) return;
+
 		await initializeTheme();
 		injectFont();
 		injectStyles();

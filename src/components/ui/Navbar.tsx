@@ -3,7 +3,6 @@ import { signal } from "@preact/signals";
 import { loadSiteInfo } from "@/src/stores/indexeddb/siteinfo";
 import { loadNotifications } from "@/src/stores/indexeddb/notification";
 import { loadCourses, courses } from "@/src/stores/indexeddb/course";
-import { replaceAllWith } from "@/src/stores/tabs";
 import { useEffect, useState, useRef } from "preact/hooks";
 
 // Signal to track which navbar dropdown is open (for closing others)
@@ -178,7 +177,6 @@ interface UserProfileProps {
 
 function UserProfile({ profile }: UserProfileProps) {
     const dropdownRef = useRef<HTMLDivElement>(null);
-
     const isOpen = navbarDropdown.value === "profile";
     const setIsOpen = (open: boolean) => {
         navbarDropdown.value = open ? "profile" : null;

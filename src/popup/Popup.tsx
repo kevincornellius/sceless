@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { enabledStorage, quizReviewHijackStorage } from "@/src/storage";
+import { enabledStorage, quizReviewHijackStorage, sceleModStorage } from "@/src/storage";
 
 interface ToggleSwitchProps {
 	checked: boolean;
@@ -42,26 +42,22 @@ function ToggleSwitch({
 
 export function Popup() {
 	const [mainEnabled, setMainEnabled] = useState<boolean | null>(null);
-	const [quizHijackEnabled, setQuizHijackEnabled] = useState<boolean | null>(
-		null,
-	);
+	const [quizHijackEnabled, setQuizHijackEnabled] = useState<boolean | null>(null);
+	const [sceleModEnabled, setSceleModEnabled] = useState<boolean | null>(null);
 
 	useEffect(() => {
 		enabledStorage.getValue().then((value) => setMainEnabled(value ?? true));
-		quizReviewHijackStorage
-			.getValue()
-			.then((value) => setQuizHijackEnabled(value ?? true));
+		quizReviewHijackStorage.getValue().then((value) => setQuizHijackEnabled(value ?? true));
+		sceleModStorage.getValue().then((value) => setSceleModEnabled(value ?? true));
 
-		const unwatchMain = enabledStorage.watch((value) =>
-			setMainEnabled(value ?? true),
-		);
-		const unwatchQuizHijack = quizReviewHijackStorage.watch((value) =>
-			setQuizHijackEnabled(value ?? true),
-		);
+		const unwatchMain = enabledStorage.watch((value) => setMainEnabled(value ?? true));
+		const unwatchQuizHijack = quizReviewHijackStorage.watch((value) => setQuizHijackEnabled(value ?? true));
+		const unwatchSceleMod = sceleModStorage.watch((value) => setSceleModEnabled(value ?? true));
 
 		return () => {
 			unwatchMain();
 			unwatchQuizHijack();
+			unwatchSceleMod();
 		};
 	}, []);
 
@@ -77,7 +73,13 @@ export function Popup() {
 		setQuizHijackEnabled(next);
 	};
 
-	if (mainEnabled === null || quizHijackEnabled === null) {
+	const toggleSceleModEnabled = async () => {
+		const next = !sceleModEnabled;
+		await sceleModStorage.setValue(next);
+		setSceleModEnabled(next);
+	};
+
+	if (mainEnabled === null || quizHijackEnabled === null || sceleModEnabled === null) {
 		return null;
 	}
 
@@ -120,9 +122,26 @@ export function Popup() {
 				/>
 			</div>
 
+			<div class="flex items-center justify-between gap-3">
+				<div>
+					<p class="text-sm font-semibold">Stylized Native Pages</p>
+					<p class="text-xs text-gray-500">
+						{sceleModEnabled
+							? "Sceless styles on SCELE pages"
+							: "Use original SCELE styles"}
+					</p>
+				</div>
+				<ToggleSwitch
+					checked={sceleModEnabled}
+					onToggle={() => { void toggleSceleModEnabled(); }}
+					ariaLabel="Toggle Stylized Native Pages"
+					activeClass="bg-emerald-600"
+				/>
+			</div>
+
 			{(!mainEnabled || !quizHijackEnabled) && (
 				<p class="text-xs text-gray-400 border-t pt-2">
-					Reload the quiz review tab after changing toggles.
+					Reload the tab after changing toggles.
 				</p>
 			)}
 		</div>

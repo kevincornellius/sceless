@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from "preact/hooks";
-import { loadDeadlinesByTimesort } from "../stores/indexeddb/deadline";
 import { Deadline } from "../types/scele";
 import { Clock, AlertCircle, FileText, ChevronLeft, ChevronRight, X } from "lucide-preact";
 
-const DAYS    = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS   = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 function isSameDay(a: Date, b: Date) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -14,38 +13,75 @@ function getMonthCells(year: number, month: number): (Date | null)[] {
     const firstDay    = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const cells: (Date | null)[] = [];
-    for (let i = 0; i < firstDay; i++)         cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++)      cells.push(new Date(year, month, d));
-    while (cells.length % 7 !== 0)              cells.push(null);
+    for (let i = 0; i < firstDay; i++)    cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+    while (cells.length % 7 !== 0)        cells.push(null);
     return cells;
 }
 
 function dayKey(d: Date) { return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
+function monthKey(year: number, month: number) { return `${year}-${month}`; }
 
 function formatRelative(ts: number): string {
     const date = new Date(ts * 1000);
     const diff = date.getTime() - Date.now();
     const h = Math.ceil(diff / 3600000);
-    if (diff < 0)   return "Overdue";
-    if (h <= 24)    return `Today ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
-    if (h <= 48)    return "Tomorrow";
+    if (diff < 0) return "Overdue";
+    if (h <= 24)  return `Today ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`;
+    if (h <= 48)  return "Tomorrow";
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export default function TasksPage() {
-    const [deadlines, setDeadlines] = useState<Deadline[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-
     const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+
     const [viewYear,  setViewYear]  = useState(today.getFullYear());
     const [viewMonth, setViewMonth] = useState(today.getMonth());
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+    const [monthCache,    setMonthCache]    = useState<Map<string, Deadline[]>>(() => new Map());
+    const [loadingMonths, setLoadingMonths] = useState<Set<string>>(() => new Set());
+    const [timeline,      setTimeline]      = useState<Deadline[]>([]);
+    const [timelineLoading, setTimelineLoading] = useState(true);
+
+    const currentKey = monthKey(viewYear, viewMonth);
+    const deadlines  = monthCache.get(currentKey) ?? [];
+    const isLoading  = loadingMonths.has(currentKey);
+
+    const fetchMonth = (year: number, month: number) => {
+        // Normalize month overflow
+        const date = new Date(year, month, 1);
+        const y = date.getFullYear();
+        const m = date.getMonth();
+        const key = monthKey(y, m);
+
+        setLoadingMonths(prev => new Set(prev).add(key));
+
+        import("../data/adapter/moodlews/deadlines")
+            .then(({ getMonthlyDeadlines }) => getMonthlyDeadlines(y, m))
+            .then(d => setMonthCache(prev => new Map(prev).set(key, d)))
+            .catch(() => setMonthCache(prev => new Map(prev).set(key, [])))
+            .finally(() => setLoadingMonths(prev => { const s = new Set(prev); s.delete(key); return s; }));
+    };
+
+    // On mount: pre-fetch current month ±2 + timeline in parallel
     useEffect(() => {
-        loadDeadlinesByTimesort()
-            .then(({ deadlines: d }) => { setDeadlines(d); setIsLoading(false); })
-            .catch(() => setIsLoading(false));
+        for (let offset = -2; offset <= 2; offset++) {
+            fetchMonth(viewYear, viewMonth + offset);
+        }
+
+        import("../data/adapter/moodlews/deadlines")
+            .then(({ getTimelineDeadlines }) => getTimelineDeadlines())
+            .then(setTimeline)
+            .catch(() => {})
+            .finally(() => setTimelineLoading(false));
     }, []);
+
+    // On navigation: fetch month on demand if not already cached
+    useEffect(() => {
+        if (monthCache.has(currentKey)) return;
+        fetchMonth(viewYear, viewMonth);
+    }, [currentKey]);
 
     const prevMonth = () => viewMonth === 0  ? (setViewMonth(11), setViewYear(y => y - 1)) : setViewMonth(m => m - 1);
     const nextMonth = () => viewMonth === 11 ? (setViewMonth(0),  setViewYear(y => y + 1)) : setViewMonth(m => m + 1);
@@ -55,34 +91,36 @@ export default function TasksPage() {
     const numWeeks = cells.length / 7;
 
     const byDay = useMemo(() => {
+        const seen = new Set<number>();
         const map = new Map<string, Deadline[]>();
-        for (const d of deadlines) {
+
+        const add = (d: Deadline) => {
+            if (seen.has(d.id)) return;
+            seen.add(d.id);
             const k = dayKey(new Date(d.dueTimestamp * 1000));
             if (!map.has(k)) map.set(k, []);
             map.get(k)!.push(d);
-        }
+        };
+
+        // Monthly view first, then fill gaps from timeline
+        for (const d of deadlines) add(d);
+        for (const d of timeline) add(d);
+
         map.forEach(arr => arr.sort((a, b) => a.dueTimestamp - b.dueTimestamp));
         return map;
-    }, [deadlines]);
+    }, [deadlines, timeline]);
 
-    const overdue  = deadlines.filter(d => d.dueTimestamp * 1000 < Date.now());
-    const upcoming = useMemo(() =>
-        deadlines
-            .filter(d => d.dueTimestamp * 1000 >= Date.now() - 86400000)
-            .sort((a, b) => a.dueTimestamp - b.dueTimestamp),
-        [deadlines]
-    );
+    const calendarDeadlines = useMemo(() => {
+        const monthStart = new Date(viewYear, viewMonth, 1).getTime() / 1000;
+        const monthEnd   = new Date(viewYear, viewMonth + 1, 0, 23, 59, 59).getTime() / 1000;
+        return [...byDay.values()].flat().filter(d => d.dueTimestamp >= monthStart && d.dueTimestamp <= monthEnd);
+    }, [byDay, viewYear, viewMonth]);
+
+    const overdue = calendarDeadlines.filter(d => d.dueTimestamp * 1000 < Date.now());
 
     const selectedTasks = selectedDate ? (byDay.get(dayKey(selectedDate)) ?? []) : null;
-    const panelTasks    = selectedTasks ?? upcoming;
-
-    if (isLoading) {
-        return (
-            <div class="flex items-center justify-center h-full">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-        );
-    }
+    const panelTasks    = selectedTasks ?? timeline;
+    const panelLoading  = selectedTasks === null && timelineLoading;
 
     return (
         <div class="h-full flex flex-col">
@@ -106,10 +144,16 @@ export default function TasksPage() {
                     Today
                 </button>
                 <div class="flex items-center gap-3 ml-auto text-xs">
-                    {overdue.length > 0 && (
-                        <span class="font-semibold text-danger">{overdue.length} overdue</span>
+                    {isLoading ? (
+                        <div class="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                        <>
+                            {overdue.length > 0 && (
+                                <span class="font-semibold text-danger">{overdue.length} overdue</span>
+                            )}
+                            <span class="text-content-muted">{calendarDeadlines.length} tasks</span>
+                        </>
                     )}
-                    <span class="text-content-muted">{deadlines.length} tasks total</span>
                 </div>
             </div>
 
@@ -117,7 +161,6 @@ export default function TasksPage() {
             <div class="flex flex-1 min-h-0">
                 {/* Calendar */}
                 <div class="flex-1 flex flex-col min-w-0">
-                    {/* Day name header row */}
                     <div class="grid grid-cols-7 border-b-2 border-edge shrink-0 bg-primary">
                         {DAYS.map(d => (
                             <div key={d} class="py-2 text-center text-[11px] font-bold uppercase tracking-wide text-on-primary">
@@ -126,7 +169,6 @@ export default function TasksPage() {
                         ))}
                     </div>
 
-                    {/* Month grid — fills remaining height */}
                     <div
                         class="flex-1 grid grid-cols-7"
                         style={{ gridTemplateRows: `repeat(${numWeeks}, 1fr)` }}
@@ -136,8 +178,8 @@ export default function TasksPage() {
                                 <div key={idx} class="border-r border-b border-edge/40 bg-page-secondary/30" />
                             );
 
-                            const tasks     = byDay.get(dayKey(date)) ?? [];
-                            const isToday   = isSameDay(date, today);
+                            const tasks      = byDay.get(dayKey(date)) ?? [];
+                            const isToday    = isSameDay(date, today);
                             const isSelected = selectedDate ? isSameDay(date, selectedDate) : false;
 
                             return (
@@ -157,9 +199,9 @@ export default function TasksPage() {
                                     </span>
                                     <div class="flex flex-col gap-0.5 w-full min-h-0">
                                         {tasks.slice(0, 3).map((task, ti) => {
-                                            const diff    = task.dueTimestamp * 1000 - Date.now();
-                                            const isOv    = diff < 0;
-                                            const urgent  = diff > 0 && diff <= 48 * 3600000;
+                                            const diff   = task.dueTimestamp * 1000 - Date.now();
+                                            const isOv   = diff < 0;
+                                            const urgent = diff > 0 && diff <= 48 * 3600000;
                                             return (
                                                 <div
                                                     key={ti}
@@ -210,7 +252,11 @@ export default function TasksPage() {
                     </div>
 
                     <div class="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2">
-                        {panelTasks.length === 0 ? (
+                        {panelLoading ? (
+                            <div class="flex items-center justify-center py-8">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                            </div>
+                        ) : panelTasks.length === 0 ? (
                             <div class="text-center py-8 text-sm text-content-muted">No tasks</div>
                         ) : panelTasks.map(task => {
                             const diff   = task.dueTimestamp * 1000 - Date.now();

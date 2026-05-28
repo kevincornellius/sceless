@@ -6,11 +6,11 @@ import { CourseDetailTab } from "./CourseDetailPage";
 import { TasksTab } from "../helper/tabs";
 import { AllCoursesTab } from "./AllCoursesPage";
 import { Course } from "../types/course";
-import { loadCourses } from "../stores/indexeddb/course";
+import { loadCourses, forceRefreshCourses } from "../stores/indexeddb/course";
 import { loadDeadlines } from "../stores/indexeddb/deadline";
 import { loadNotifications } from "../stores/indexeddb/notification";
 import { Deadline, AppNotification, Announcement } from "../types/scele";
-import { Clock, Bell, AlertCircle, Pin, BookOpen, CheckCircle, MessageSquare, Calendar, Star, ChevronRight, FileText, Sparkles, Megaphone } from "lucide-preact";
+import { Clock, Bell, AlertCircle, Pin, BookOpen, CheckCircle, MessageSquare, Calendar, Star, ChevronRight, FileText, Sparkles, Megaphone, RefreshCw } from "lucide-preact";
 import { pinnedCourses, togglePin, isPinned } from "../stores/pinned";
 import { wsToken } from "../stores/auth";
 import { getAllCachedNewModuleCounts } from "../stores/seenModules";
@@ -139,6 +139,18 @@ export default function DashboardPage() {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [newModuleCounts, setNewModuleCounts] = useState<Record<string, number>>({});
+    const [refreshing, setRefreshing] = useState(false);
+
+    const handleRefreshCourses = () => {
+        setRefreshing(true);
+        forceRefreshCourses()
+            .then(fresh => {
+                const pinnedIds = new Set(pinnedCourses.value.map(c => c.id));
+                setCourses(fresh.map(c => ({ ...c, isPinned: pinnedIds.has(c.id) }))
+                    .sort((a, b) => (a.isPinned === b.isPinned ? 0 : a.isPinned ? -1 : 1)));
+            })
+            .finally(() => setRefreshing(false));
+    };
 
     // Stats
     const dueToday = deadlines.filter(d => {
@@ -369,6 +381,14 @@ export default function DashboardPage() {
                                         <span class="text-xs px-2 py-0.5 rounded-lg font-semibold bg-edge text-content-muted">
                                             {courses.filter(c => !isPinned(c.id)).length}
                                         </span>
+                                        <button
+                                            onClick={handleRefreshCourses}
+                                            disabled={refreshing}
+                                            class="p-1 rounded-lg hover:bg-edge transition-colors cursor-pointer disabled:opacity-50"
+                                            title="Refresh courses"
+                                        >
+                                            <RefreshCw class={`w-3.5 h-3.5 text-content-muted ${refreshing ? "animate-spin" : ""}`} />
+                                        </button>
                                         <button
                                             onClick={() => navigateTab(AllCoursesTab)}
                                             class="ml-auto text-xs font-semibold text-primary hover:underline"

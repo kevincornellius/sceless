@@ -8,4 +8,7 @@ export var SCELE_EXCLUDES = [
 	"*://scele.cs.ui.ac.id/*mod*",
 	"*://scele.cs.ui.ac.id/course/index.php?*",
 	"*://scele.cs.ui.ac.id/enrol/**",
+	// Show these user pages natively (styled via scele-mod)
+	"*://scele.cs.ui.ac.id/user/profile.php*",
+	"*://scele.cs.ui.ac.id/user/edit.php*",
 ];
