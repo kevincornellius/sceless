@@ -48,6 +48,13 @@ export default function TasksPage() {
     const deadlines  = monthCache.get(currentKey) ?? [];
     const isLoading  = loadingMonths.has(currentKey);
 
+    // Months within ±2 of today get IndexedDB caching; further months are fetched directly
+    const isWithinCacheRange = (year: number, month: number) => {
+        const todayTotalMonths = today.getFullYear() * 12 + today.getMonth();
+        const targetTotalMonths = year * 12 + month;
+        return Math.abs(targetTotalMonths - todayTotalMonths) <= 2;
+    };
+
     const fetchMonth = (year: number, month: number) => {
         // Normalize month overflow
         const date = new Date(year, month, 1);
@@ -57,27 +64,29 @@ export default function TasksPage() {
 
         setLoadingMonths(prev => new Set(prev).add(key));
 
-        import("../data/adapter/moodlews/deadlines")
-            .then(({ getMonthlyDeadlines }) => getMonthlyDeadlines(y, m))
-            .then(d => setMonthCache(prev => new Map(prev).set(key, d)))
+        const fetch = isWithinCacheRange(y, m)
+            ? import("../stores/indexeddb/deadline")
+                .then(({ loadMonthlyDeadlines }) => loadMonthlyDeadlines(y, m))
+                .then(({ deadlines }) => deadlines)
+            : import("../data/adapter/moodlews/deadlines")
+                .then(({ getMonthlyDeadlines }) => getMonthlyDeadlines(y, m));
+
+        fetch
+            .then(deadlines => setMonthCache(prev => new Map(prev).set(key, deadlines)))
             .catch(() => setMonthCache(prev => new Map(prev).set(key, [])))
             .finally(() => setLoadingMonths(prev => { const s = new Set(prev); s.delete(key); return s; }));
     };
 
-    // On mount: pre-fetch current month ±2 + timeline in parallel
+    // On mount: fetch timeline (session-cached — no re-fetch on tab navigation)
     useEffect(() => {
-        for (let offset = -2; offset <= 2; offset++) {
-            fetchMonth(viewYear, viewMonth + offset);
-        }
-
-        import("../data/adapter/moodlews/deadlines")
-            .then(({ getTimelineDeadlines }) => getTimelineDeadlines())
+        import("../stores/indexeddb/deadline")
+            .then(({ loadTimelineDeadlines }) => loadTimelineDeadlines())
             .then(setTimeline)
             .catch(() => {})
             .finally(() => setTimelineLoading(false));
     }, []);
 
-    // On navigation: fetch month on demand if not already cached
+    // On navigation (and initial mount): fetch month on demand if not already in memory or cache
     useEffect(() => {
         if (monthCache.has(currentKey)) return;
         fetchMonth(viewYear, viewMonth);
