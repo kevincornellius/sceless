@@ -29,7 +29,7 @@ export default defineConfig({
 	},
 	manifest: {
 		name: "Sceless",
-		permissions: ["storage", "tabs"],
+		permissions: ["storage"],
 		icons: {
 			16: "icon-16.png",
 			48: "icon-48.png",
