@@ -35,10 +35,13 @@ export default defineConfig({
 			48: "icon-48.png",
 			128: "icon-128.png",
 		},
-		// Required by Firefox AMO validation
-		data_collection_permissions: {
-			required: [],
-			optional: [],
+		browser_specific_settings: {
+			gecko: {
+				data_collection_permissions: {
+					required: [],
+					optional: [],
+				},
+			} as object,
 		},
 	},
 });
