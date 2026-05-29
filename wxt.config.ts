@@ -38,7 +38,7 @@ export default defineConfig({
 		browser_specific_settings: {
 			gecko: {
 				data_collection_permissions: {
-					required: [],
+					required: ["none"],
 					optional: [],
 				},
 			} as object,
