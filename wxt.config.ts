@@ -37,6 +37,7 @@ export default defineConfig({
 		},
 		browser_specific_settings: {
 			gecko: {
+				id: "sceless@cornellius.dev",
 				data_collection_permissions: {
 					required: ["none"],
 					optional: [],
