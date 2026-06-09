@@ -1111,5 +1111,14 @@ export default defineContentScript({
 		} else {
 			void mountHijackedReview();
 		}
+
+		// When the tab returns from a long background freeze, re-apply theme CSS
+		// variables so the page doesn't sit in a broken visual state while the
+		// extension background page is waking up.
+		document.addEventListener("visibilitychange", () => {
+			if (document.visibilityState === "visible") {
+				void initializeTheme();
+			}
+		});
 	},
 });
