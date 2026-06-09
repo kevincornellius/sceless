@@ -13,6 +13,9 @@ export default defineContentScript({
 	async main() {
 		console.log("[sceless] Content script main() running on:", window.location.href);
 
+		// Mark synchronously (before any await) so scele-mod can detect SPA takeover
+		document.documentElement.setAttribute('data-sceless-spa', '');
+
 		const enabled = (await enabledStorage.getValue()) ?? true;
 
 		if (!enabled) {

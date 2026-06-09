@@ -400,6 +400,9 @@ export default defineContentScript({
 	cssInjectionMode: "manual",
 
 	async main() {
+		// Don't run on pages where the Sceless SPA has taken over
+		if (document.documentElement.hasAttribute('data-sceless-spa')) return;
+
 		const enabled = (await sceleModStorage.getValue()) ?? true;
 		if (!enabled) return;
 
