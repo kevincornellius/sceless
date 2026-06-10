@@ -1072,6 +1072,8 @@ export default defineContentScript({
 
 			ensureStyles();
 
+			import("@/src/stores/indexeddb/activity").then(({ trackQuizReviewOpened }) => trackQuizReviewOpened());
+
 			if (!document.getElementById("sceless-quiz-font")) {
 				const fontStyle = document.createElement("style");
 				fontStyle.id = "sceless-quiz-font";

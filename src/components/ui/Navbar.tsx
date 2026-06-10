@@ -176,12 +176,56 @@ interface UserProfileProps {
     profile: ProfileType | null;
 }
 
+function ClearDataModal({ onConfirm, onCancel }: {
+    onConfirm: (keepStats: boolean) => void;
+    onCancel: () => void;
+}) {
+    const [keepStats, setKeepStats] = useState(true);
+    return (
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={onCancel}>
+            <div class="bg-page border-2 border-edge rounded-2xl p-6 w-80 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <h3 class="font-bold text-base text-content mb-1">Clear All Data?</h3>
+                <p class="text-sm text-content-muted mb-4">
+                    Removes your token, settings, and cached data. You'll be logged out.
+                </p>
+                <label class="flex items-center gap-3 p-3 rounded-xl border-2 border-edge bg-page-secondary cursor-pointer mb-5 hover:border-primary transition-colors">
+                    <input
+                        type="checkbox"
+                        checked={keepStats}
+                        onChange={() => setKeepStats(v => !v)}
+                        class="w-4 h-4 accent-primary shrink-0"
+                    />
+                    <div>
+                        <p class="text-sm font-semibold text-content">Keep Wrapped stats</p>
+                        <p class="text-xs text-content-muted">Preserve activity history for Sceless Wrapped</p>
+                    </div>
+                </label>
+                <div class="flex gap-2">
+                    <button
+                        onClick={onCancel}
+                        class="flex-1 py-2 rounded-lg border-2 border-edge text-sm font-semibold text-content hover:bg-page-secondary transition-colors cursor-pointer"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => onConfirm(keepStats)}
+                        class="flex-1 py-2 rounded-lg bg-danger text-on-primary text-sm font-semibold hover:bg-danger/80 transition-colors cursor-pointer"
+                    >
+                        Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function UserProfile({ profile }: UserProfileProps) {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const isOpen = navbarDropdown.value === "profile";
     const setIsOpen = (open: boolean) => {
         navbarDropdown.value = open ? "profile" : null;
     };
+    const [showClearModal, setShowClearModal] = useState(false);
 
     const initials = profile?.name
         ?.split(" ")
@@ -197,9 +241,20 @@ function UserProfile({ profile }: UserProfileProps) {
         await db.clearFullDatabase();
         window.location.reload();
     };
-    const handleClearData = async () => {
+    const handleClearData = () => {
+        setIsOpen(false);
+        setShowClearModal(true);
+    };
+    const handleClearDataConfirm = async (keepStats: boolean) => {
+        let saved: { activity_stats?: unknown } = {};
+        if (keepStats) {
+            saved = await browser.storage.local.get("activity_stats");
+        }
         await db.clearFullDatabase();
         await browser.storage.local.clear();
+        if (keepStats && saved.activity_stats !== undefined) {
+            await browser.storage.local.set({ activity_stats: saved.activity_stats });
+        }
         window.location.reload();
     };
 
@@ -234,6 +289,13 @@ function UserProfile({ profile }: UserProfileProps) {
                     class={`text-content-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
                 />
             </button>
+
+            {showClearModal && (
+                <ClearDataModal
+                    onConfirm={(keepStats) => { setShowClearModal(false); void handleClearDataConfirm(keepStats); }}
+                    onCancel={() => setShowClearModal(false)}
+                />
+            )}
 
             {isOpen && (
                 <div class="absolute right-0 mt-2 top-full w-56 bg-page border border-edge rounded-lg shadow-lg overflow-hidden z-50">

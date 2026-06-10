@@ -6,7 +6,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
 import AllCoursesPage from "./pages/AllCoursesPage";
-import { initializeTheme } from "./stores/theme";
+import { theme, initializeTheme } from "./stores/theme";
 import { initNavigation, navigateTab, markBootComplete } from "./routing/router";
 import { initAuthStore, wsToken } from "./stores/auth";
 import { LoginPage } from "./pages/LoginPage";
@@ -91,6 +91,7 @@ const App = () => {
 
                     await navigateTab(UrlToTab(window.location.href) || DashboardTab);
                     markBootComplete();
+                    import("./stores/indexeddb/activity").then(({ trackThemeInit }) => trackThemeInit(theme.value.name));
                 } catch (e) {
                     console.error("Failed to boot core data", e);
                     setBootError(e instanceof Error ? e.message : "An unexpected error occurred.");
