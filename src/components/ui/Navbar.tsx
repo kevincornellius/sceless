@@ -3,6 +3,7 @@ import { signal } from "@preact/signals";
 import { loadSiteInfo } from "@/src/stores/indexeddb/siteinfo";
 import { loadNotifications } from "@/src/stores/indexeddb/notification";
 import { loadCourses, courses } from "@/src/stores/indexeddb/course";
+import { isSearchOpen } from "@/src/stores/hotkeys";
 import { useEffect, useState, useRef } from "preact/hooks";
 
 // Signal to track which navbar dropdown is open (for closing others)
@@ -13,7 +14,7 @@ export const closeAllDropdowns = () => {
 };
 import type { Profile as ProfileType } from "@/src/types/profile";
 import type { AppNotification } from "@/src/types/scele";
-import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon, Settings } from "lucide-preact";
+import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon, Settings, Flag } from "lucide-preact";
 import { logout } from "@/src/stores/auth";
 import { theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes, type ThemeConfig } from "@/src/types/themes";
@@ -287,7 +288,6 @@ function UserProfile({ profile }: UserProfileProps) {
 const Navbar = () => {
     const [profile, setProfile] = useState<ProfileType | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
 
 	const [currentTime, setCurrentTime] = useState(new Date())
@@ -312,17 +312,8 @@ const Navbar = () => {
         const tab = CourseDetailTab(courseId.toString(), courseTitle);
         navigateTab(tab);
         setSearchQuery("");
-        setIsSearchOpen(false);
+        isSearchOpen.value = false;
         closeAllDropdowns();
-    };
-    
-    const handleSearchFocus = () => {
-        setIsSearchOpen(true);
-    };
-
-    const handleSearchInput = (e: Event) => {
-        setSearchQuery((e.target as HTMLInputElement).value);
-        setIsSearchOpen(true);
     };
 	
     useEffect(() => {
@@ -337,20 +328,20 @@ const Navbar = () => {
 
 			<div className="relative hidden sm:block" ref={searchRef}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
-                <input 
-                    type="text" 
-                    placeholder="Search courses..." 
+                <input
+                    type="text"
+                    placeholder="Search courses..."
                     value={searchQuery}
                     onInput={(e) => {
                         setSearchQuery((e.target as HTMLInputElement).value);
-                        setIsSearchOpen(true);
+                        isSearchOpen.value = true;
                     }}
-                    onFocus={() => setIsSearchOpen(true)}
+                    onFocus={() => { isSearchOpen.value = true; }}
                     className="w-64 lg:w-72 pl-9 pr-3 py-2 rounded-lg text-sm border-2 transition-all focus:outline-none bg-page text-content border-edge focus:border-primary focus:ring-1 focus:ring-primary"
                 />
                 
                 {/* Search Results Dropdown */}
-                {isSearchOpen && filteredCourses.length > 0 && (
+                {isSearchOpen.value && filteredCourses.length > 0 && (
                     <div class="absolute top-full mt-2 w-full bg-page border border-edge rounded-lg shadow-lg overflow-hidden z-50">
                         {filteredCourses.map(course => (
                             <button
@@ -378,6 +369,14 @@ const Navbar = () => {
 				  <Notifications />
 
                   <ThemeSelector />
+
+                  <a
+                      href="mailto:kevcornellius@gmail.com?subject=Sceless%20Feedback%20%2F%20Bug%20Report"
+                      title="Report a bug or send feedback"
+                      class="p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-edge hover:text-content transition-all"
+                  >
+                      <Flag className="w-4 h-4" />
+                  </a>
 
                 <UserProfile profile={profile} />
 			</div>

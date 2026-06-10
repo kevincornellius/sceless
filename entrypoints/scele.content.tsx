@@ -1,5 +1,6 @@
 import { render } from "preact";
 import App from "@/src/App";
+import { ErrorBoundary } from "@/src/components/ErrorBoundary";
 import { SCELE_EXCLUDES, SCELE_MATCHES } from "@/src/config";
 import tailwindCss from "@/src/assets/tailwind.css?inline";
 import { enabledStorage } from "@/src/storage";
@@ -55,7 +56,7 @@ export default defineContentScript({
 
 			const root = document.getElementById("sceless-root");
 			if (root) {
-				render(<App />, root);
+				render(<ErrorBoundary><App /></ErrorBoundary>, root);
 			}
 		};
 
