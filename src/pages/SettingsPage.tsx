@@ -170,10 +170,34 @@ export default function SettingsPage() {
                     <div class="px-4 pt-4 pb-2 border-b border-edge">
                         <h2 class="text-xs font-bold uppercase tracking-wider text-content-muted">About</h2>
                     </div>
-                    <div class="px-4 py-4 space-y-2 text-sm text-content-muted">
-                        <div class="flex justify-between">
+                    <div class="px-4 py-4 space-y-3 text-sm text-content-muted">
+                        <div class="flex justify-between items-center">
                             <span>Version</span>
                             <span class="font-semibold text-content">{version}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Website</span>
+                            <a
+                                href="https://sceless.cornellius.dev"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex items-center gap-1 font-semibold text-primary hover:underline"
+                            >
+                                sceless.cornellius.dev
+                                <ExternalLink class="w-3 h-3" />
+                            </a>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Privacy Policy</span>
+                            <a
+                                href="https://sceless.cornellius.dev/privacy"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="flex items-center gap-1 font-semibold text-primary hover:underline"
+                            >
+                                View
+                                <ExternalLink class="w-3 h-3" />
+                            </a>
                         </div>
                     </div>
                 </div>

@@ -20,8 +20,8 @@ export async function getAnnouncements(): Promise<Announcement[]> {
         userid: d.userid,
         userfullname: d.userfullname ?? "",
         userpictureurl: d.userpictureurl,
-        timecreated: d.timecreated,
-        timemodified: d.timemodified,
+        timecreated: d.timecreated ?? d.created ?? d.timemodified ?? 0,
+        timemodified: d.timemodified ?? d.timecreated ?? 0,
         url: `${SCELE_URL}/mod/forum/discuss.php?d=${d.discussion}`,
         attachments: Array.isArray(d.attachments)
             ? d.attachments.map((f: any) => ({

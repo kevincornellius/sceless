@@ -19,6 +19,7 @@ import {
 	BookMarked,
 } from "lucide-preact";
 import { SCELE_URL } from "../../config";
+import { sanitizeHtml } from "../../utils/sanitize";
 import { CourseSection, CourseModule, getModuleDueDate, formatDueDate } from "../../types/course";
 import { theme } from "../../stores/theme";
 import type { ModuleTypeColors } from "../../types/themes";
@@ -241,7 +242,7 @@ export function ChronologicalView({ sections, newModuleIds = [] }: { sections: C
 								{cleanSummary && (
 									<div
 										class="px-4 py-3 text-sm text-content-muted bg-page/50 [&_a]:text-primary [&_a]:underline"
-										dangerouslySetInnerHTML={{ __html: cleanSummary }}
+										dangerouslySetInnerHTML={{ __html: sanitizeHtml(cleanSummary) }}
 									/>
 								)}
 								{visibleModules.length === 0 && !cleanSummary ? (
@@ -434,7 +435,7 @@ function ModuleItem({
 			<div class={`px-4 py-3 ${indentClass}`}>
 				<div
 					class="text-sm text-content [&_h3]:font-bold [&_h3]:mb-2 [&_h4]:font-bold [&_h4]:mb-1.5 [&_h5]:font-bold [&_h5]:mb-1 [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-2 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-2 [&_li]:mb-0.5 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_strong]:font-semibold [&_a]:text-primary [&_a]:underline"
-					dangerouslySetInnerHTML={{ __html: module.description || "" }}
+					dangerouslySetInnerHTML={{ __html: sanitizeHtml(module.description || "") }}
 				/>
 			</div>
 		);
@@ -500,7 +501,7 @@ function ModuleItem({
 					{showDesc && cleanDesc && (
 						<div
 							class="mt-2 p-3 rounded-lg bg-page text-sm text-content [&_a]:text-primary [&_a]:underline [&_p]:mb-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:mb-1.5 [&_strong]:font-semibold [&_h3]:font-bold [&_h3]:mb-1 [&_h4]:font-semibold [&_h4]:mb-1 [&_table]:border-collapse [&_td]:border [&_td]:border-edge [&_td]:px-2 [&_td]:py-1 [&_li]:mb-0.5"
-							dangerouslySetInnerHTML={{ __html: cleanDesc }}
+							dangerouslySetInnerHTML={{ __html: sanitizeHtml(cleanDesc) }}
 						/>
 					)}
 
@@ -520,7 +521,7 @@ function ModuleItem({
 					{isRestricted && module.availabilityinfo && (
 						<div
 							class="mt-1.5 text-xs text-content-muted italic [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-3 [&_ul]:mt-0.5 [&_li]:mt-0.5"
-							dangerouslySetInnerHTML={{ __html: module.availabilityinfo }}
+							dangerouslySetInnerHTML={{ __html: sanitizeHtml(module.availabilityinfo) }}
 						/>
 					)}
 				</div>

@@ -3,17 +3,17 @@ import { Logo } from "@/src/components/ui/Logo";
 import { initializeTheme, theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes } from "@/src/types/themes";
 import { sceleModStorage } from "@/src/storage";
+import fontCss from "@/src/assets/fonts/plus-jakarta-sans.css?inline";
 
 const STYLE_ID = "sceless-mod-style";
 const FONT_ID = "sceless-mod-font";
 
 function injectFont() {
 	if (document.getElementById(FONT_ID)) return;
-	const link = document.createElement("link");
-	link.id = FONT_ID;
-	link.rel = "stylesheet";
-	link.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap";
-	document.head.appendChild(link);
+	const style = document.createElement("style");
+	style.id = FONT_ID;
+	style.textContent = fontCss;
+	document.head.appendChild(style);
 }
 
 function injectStyles() {
@@ -30,7 +30,7 @@ input, button, select, textarea, label,
 .nav-link, .navbar-brand, .dropdown-item,
 .breadcrumb-item, .card-title, .card-body,
 div[role="main"], .generalbox, .submissionstatustable {
-	font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif !important;
+	font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif !important;
 }
 
 /* Font sizes */
@@ -265,7 +265,7 @@ a { color: var(--theme-primary, #58cc02) !important; }
 	font-weight: 700 !important;
 	letter-spacing: 0.04em !important;
 	cursor: pointer !important;
-	font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif !important;
+	font-family: "Plus Jakarta Sans", "Segoe UI", sans-serif !important;
 }
 
 .sceless-theme-select:hover {
@@ -393,6 +393,7 @@ export default defineContentScript({
 		"*://scele.cs.ui.ac.id/mod/**",
 		"*://scele.cs.ui.ac.id/course/**",
 		"*://scele.cs.ui.ac.id/enrol/**",
+		"*://scele.cs.ui.ac.id/grade/**",
 		"*://scele.cs.ui.ac.id/user/**",
 	],
 	excludeMatches: ["*://scele.cs.ui.ac.id/mod/quiz/review.php*"],
@@ -400,6 +401,9 @@ export default defineContentScript({
 	cssInjectionMode: "manual",
 
 	async main() {
+		// Don't run on pages where the Sceless SPA has taken over
+		if (document.documentElement.hasAttribute('data-sceless-spa')) return;
+
 		const enabled = (await sceleModStorage.getValue()) ?? true;
 		if (!enabled) return;
 

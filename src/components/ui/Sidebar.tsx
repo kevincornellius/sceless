@@ -12,11 +12,30 @@ import { useEffect, useState } from "preact/hooks";
 import { Logo, LogoL } from "./Logo";
 import {
 	BookOpen,
+	CalendarDays,
 	ChevronLeft,
-	LayoutDashboardIcon,
+	ClipboardList,
+	FileText,
+	LayoutDashboard,
+	Library,
 	Menu,
+	MessageSquare,
+	Settings,
 	X,
 } from "lucide-preact";
+
+function getTabIcon(type: string) {
+	switch (type) {
+		case "dashboard":   return LayoutDashboard;
+		case "tasks":       return CalendarDays;
+		case "course":      return BookOpen;
+		case "settings":    return Settings;
+		case "all-courses": return Library;
+		case "quiz-review": return ClipboardList;
+		case "forum":       return MessageSquare;
+		default:            return FileText;
+	}
+}
 import { ACTION_TABS } from "@/src/constants/navigation";
 import { Tab } from "@/src/types/state";
 import { newModuleCounts } from "@/src/stores/seenModules";
@@ -102,11 +121,19 @@ const Sidebar = () => {
 		</div>
 	);
 
-	const TabBar = ({ tab, icon, closable }: { tab: Tab; icon: any, closable: boolean }) => {
+	const TabBar = ({ tab, closable }: { tab: Tab; closable: boolean }) => {
 		const key = getTabKey(tab);
 		const active = activeTabKey.value === key;
-		const Icon = icon;
+		const Icon = getTabIcon(tab.type);
 		const newCount = tab.type === "course" ? ((newModuleCounts.value ?? {})[tab.id] ?? 0) : 0;
+		const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null);
+
+		const handleMouseEnter = (e: MouseEvent) => {
+			const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+			setTooltip({ top: rect.top + rect.height / 2, left: rect.right + 8 });
+		};
+
+		const handleMouseLeave = () => setTooltip(null);
 
 		const handleClick = (e: MouseEvent) => {
 			// Open in new tab with ctrl/cmd key
@@ -124,19 +151,21 @@ const Sidebar = () => {
 		};
 
 		return (
+			<>
 			<a
 				href={TabToUrl(tab)}
 				onClick={(e) => {
 					e.preventDefault();
 					handleClick(e);
 				}}
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
 				target="_blank"
 				class={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
 					active
 						? "bg-primary text-on-primary"
 						: "text-content-muted hover:text-content hover:bg-primary/10"
 				}`}
-                title={tab.title}
 			>
 				<Icon width={18} class="shrink-0" />
 				{!expanded && newCount > 0 && (
@@ -189,6 +218,21 @@ const Sidebar = () => {
 					)
 				)}
 			</a>
+			{tooltip && (
+				<div
+					style={{
+						position: "fixed",
+						top: `${tooltip.top}px`,
+						left: `${tooltip.left}px`,
+						transform: "translateY(-50%)",
+						zIndex: 9999,
+					}}
+					class="px-2.5 py-1 bg-content text-page text-xs font-semibold rounded-md shadow-lg pointer-events-none whitespace-nowrap"
+				>
+					{tab.title}
+				</div>
+			)}
+			</>
 		);
 	};
 
@@ -205,7 +249,7 @@ const Sidebar = () => {
 				)}
 				<div class="flex flex-col gap-0.5 px-2">
 					{ACTION_TABS.map((tab) => (
-						<TabBar tab={tab} icon={LayoutDashboardIcon} closable={false} />
+						<TabBar tab={tab} closable={false} />
 					))}
 				</div>
 				<span class="border-t border-edge mx-2 my-2" />
@@ -236,7 +280,7 @@ const Sidebar = () => {
 				)}
 				<div class="flex flex-col gap-0.5 px-2">
 					{pinnedTabs.map((tab) => (
-						<TabBar tab={tab} icon={BookOpen} closable={false} />
+						<TabBar tab={tab} closable={false} />
 					))}
 				</div>
 				<span class="border-t border-edge mx-2 my-2" />
@@ -284,7 +328,6 @@ const Sidebar = () => {
 						<TabBar
 							key={getTabKey(tab)}
 							tab={tab}
-							icon={BookOpen}
 							closable={true}
 						/>
 					))}

@@ -27,9 +27,8 @@ async function getSeenModuleIds(courseId: string): Promise<number[]> {
  * Save seen module IDs for a course.
  */
 async function saveSeenModuleIds(courseId: string, ids: number[]): Promise<void> {
-    const all = await db.get<SeenModulesData>("cache", SEEN_MODULES_KEY) ?? {};
-    all[courseId] = ids;
-    await db.set("cache", SEEN_MODULES_KEY, all);
+    const existing = await db.get<SeenModulesData>("cache", SEEN_MODULES_KEY) ?? {};
+    await db.set("cache", SEEN_MODULES_KEY, { ...existing, [courseId]: [...ids] });
 }
 
 /**
@@ -47,8 +46,7 @@ export async function markCourseSeen(courseId: string, sections: CourseSection[]
     const newCount = currentIds.filter(id => !existingIds.includes(id)).length;
     if (newCount > 0) {
         const counts = await db.get<NewModuleCountData>("cache", NEW_MODULE_COUNT_KEY) ?? {};
-        counts[courseId] = (counts[courseId] ?? 0) + newCount;
-        await db.set("cache", NEW_MODULE_COUNT_KEY, counts);
+        await db.set("cache", NEW_MODULE_COUNT_KEY, { ...counts, [courseId]: (counts[courseId] ?? 0) + newCount });
         await refreshNewModuleCounts();
     }
 }
@@ -99,7 +97,7 @@ export async function refreshNewModuleCounts(): Promise<void> {
  */
 export async function clearNewModuleCount(courseId: string): Promise<void> {
     const counts = await db.get<NewModuleCountData>("cache", NEW_MODULE_COUNT_KEY) ?? {};
-    delete counts[courseId];
-    await db.set("cache", NEW_MODULE_COUNT_KEY, counts);
+    const { [courseId]: _, ...rest } = counts;
+    await db.set("cache", NEW_MODULE_COUNT_KEY, rest);
     await refreshNewModuleCounts();
 }

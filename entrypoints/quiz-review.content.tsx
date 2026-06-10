@@ -1,4 +1,5 @@
 import tailwindCss from "@/src/assets/tailwind.css?inline";
+import fontCss from "@/src/assets/fonts/plus-jakarta-sans.css?inline";
 import { quizReviewHijackStorage } from "@/src/storage";
 import { initializeTheme } from "@/src/stores/theme";
 import { buildQuizReviewPayloadFromDom } from "@/src/helper/quizReviewDom";
@@ -1070,6 +1071,14 @@ export default defineContentScript({
 					: attemptParam || "";
 
 			ensureStyles();
+
+			if (!document.getElementById("sceless-quiz-font")) {
+				const fontStyle = document.createElement("style");
+				fontStyle.id = "sceless-quiz-font";
+				fontStyle.textContent = fontCss;
+				document.head.appendChild(fontStyle);
+			}
+
 			await initializeTheme();
 
 			document.documentElement.classList.add(HIJACK_CLASS);
@@ -1102,5 +1111,14 @@ export default defineContentScript({
 		} else {
 			void mountHijackedReview();
 		}
+
+		// When the tab returns from a long background freeze, re-apply theme CSS
+		// variables so the page doesn't sit in a broken visual state while the
+		// extension background page is waking up.
+		document.addEventListener("visibilitychange", () => {
+			if (document.visibilityState === "visible") {
+				void initializeTheme();
+			}
+		});
 	},
 });

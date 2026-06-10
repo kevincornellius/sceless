@@ -453,7 +453,7 @@ export default function DashboardPage() {
                                             <div class="flex-1 min-w-0">
                                                 <p class="font-semibold text-sm text-content truncate leading-snug">{a.name}</p>
                                                 <p class="text-xs text-content-muted mt-0.5">
-                                                    {a.userfullname} · {new Date(a.timecreated * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                                    {a.userfullname}{a.timecreated > 0 ? ` · ${new Date(a.timecreated * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
                                                 </p>
                                                 {items.length > 0 && (
                                                     <div class="flex flex-wrap gap-1 mt-1.5">

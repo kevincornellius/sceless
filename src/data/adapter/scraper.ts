@@ -29,7 +29,6 @@ export const scrapeSceleData = () => {
 
 export const fetchCoursesFromMy = async () => {
 	try {
-		console.log("[sceless] Ghost fetching /my/ ...");
 
 		const response = await fetch("https://scele.cs.ui.ac.id/my/");
 		if (!response.ok) throw new Error("Failed to fetch /my");
@@ -65,7 +64,6 @@ export const fetchCoursesFromMy = async () => {
 			};
 		});
 
-		console.log("[sceless] Parsed /my!", courses);
 		return courses;
 	} catch (error) {
 		console.error("[sceless] Courses fetch error:", error);
@@ -77,7 +75,6 @@ export const fetchCourseContent = async (
 	courseUrl: string,
 ): Promise<{ title: string; topics: Topic[] }> => {
 	try {
-		console.log("[sceless] Ghost fetching course:", courseUrl);
 
 		const response = await fetch(courseUrl);
 		if (!response.ok) throw new Error(`Failed to fetch ${courseUrl}`);
@@ -97,7 +94,6 @@ export const fetchCourseContent = async (
 		const courseContent = virtualDoc.querySelector(".course-content");
 
 		if (!courseContent) {
-			console.log("[sceless] Course content not found");
 			return { title, topics: [] };
 		}
 
@@ -197,7 +193,6 @@ export const fetchCourseContent = async (
 			return { title, activities };
 		});
 
-		console.log("[sceless] Parsed course content!", title, topics);
 		return { title, topics };
 	} catch (error) {
 		console.error("[sceless] Course content fetch error:", error);
@@ -207,7 +202,6 @@ export const fetchCourseContent = async (
 
 export const fetchUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
 	try {
-		console.log("[sceless] Ghost fetching calendar/upcoming ...");
 
 		const response = await fetch(
 			"https://scele.cs.ui.ac.id/calendar/view.php?view=upcoming",
@@ -284,7 +278,6 @@ export const fetchUpcomingEvents = async (): Promise<UpcomingEvent[]> => {
 			};
 		});
 
-		console.log("[sceless] Parsed upcoming events:", events);
 		return events;
 	} catch (error) {
 		console.error("[sceless] Upcoming events fetch error:", error);

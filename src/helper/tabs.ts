@@ -47,7 +47,6 @@ export function UrlToTab(urlString: string): Tab | null {
 		const url = new URL(urlString);
 		const path = url.pathname;
 		const id = url.searchParams.get("id");
-		console.log("Parsing URL to tab:", urlString, "->", { path, id });
 		if (path === "/") {
 			return DashboardTab;
 		}

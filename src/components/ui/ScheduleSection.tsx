@@ -70,14 +70,11 @@ export function ScheduleSection() {
     const handleFileChange = async (e: Event) => {
         const input = e.target as HTMLInputElement;
         const file = input.files?.[0];
-        console.log("[Schedule] File selected:", file?.name, file?.size);
         if (!file) return;
         setIsUploading(true);
         try {
             const text = await file.text();
-            console.log("[Schedule] ICS content length:", text.length, "first 200:", text.slice(0, 200));
             const events = await saveScheduleICS(file.name, text);
-            console.log("[Schedule] Parsed events:", events.length, events);
         } catch (err) {
             console.error("[Schedule] Failed to parse ICS:", err);
         } finally {

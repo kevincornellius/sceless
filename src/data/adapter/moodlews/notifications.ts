@@ -1,6 +1,5 @@
 import { fetchMoodle } from "./fetch";
 import { AppNotification } from "../../../types/scele";
-import { logout } from "@/src/stores/auth";
 
 export interface MoodleNotification {
     id: number;
@@ -24,7 +23,6 @@ export async function getNotifications(): Promise<AppNotification[]> {
 
     if (!userId) {
         console.warn("No user ID found, cannot fetch notifications");
-        logout();
         return [];
     }
 
@@ -36,13 +34,9 @@ export async function getNotifications(): Promise<AppNotification[]> {
         }
     );
 
-    console.log("Fetched notifications data:", data);
-
     if (!data || !data.messages) {
         return [];
     }
-
-    console.log("Raw notifications data:", data.messages);
 
     return data.messages.map(n => {
         let courseId: number | undefined;

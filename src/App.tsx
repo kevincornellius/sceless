@@ -45,10 +45,11 @@ const getPageFromActiveTabKey = (): ComponentChildren => {
 const PageContent = () => {
 	return getPageFromActiveTabKey();
 };
-type AppState = 'checking_auth' | 'unauthenticated' | 'booting_data' | 'ready';
+type AppState = 'checking_auth' | 'unauthenticated' | 'booting_data' | 'ready' | 'error';
 
 const App = () => {
     const [appState, setAppState] = useState<AppState>('checking_auth');
+    const [bootError, setBootError] = useState<string | null>(null);
 
     useEffect(() => {
         const initializeAuth = async () => {
@@ -82,7 +83,6 @@ const App = () => {
         if (appState === 'booting_data') {
             const bootCoreData = async () => {
                 try {
-                    console.log("Bootstrapping core application data...");
                     await loadSiteInfo();
                     await loadCourses();
                     await initPinnedCoursesStore();
@@ -93,9 +93,11 @@ const App = () => {
                     markBootComplete();
                 } catch (e) {
                     console.error("Failed to boot core data", e);
-                } finally {
-                    setAppState('ready'); // ONLY NOW do we let the UI render
+                    setBootError(e instanceof Error ? e.message : "An unexpected error occurred.");
+                    setAppState('error');
+                    return;
                 }
+                setAppState('ready'); // ONLY NOW do we let the UI render
             };
             bootCoreData();
         }
@@ -107,6 +109,31 @@ const App = () => {
         return () => window.removeEventListener("beforeunload", handleUnload);
     }, []);
 
+
+    if (appState === 'error') {
+        return (
+            <div class="min-h-screen bg-page flex items-center justify-center">
+                <div class="max-w-md text-center p-8">
+                    <div class="w-12 h-12 rounded-full bg-danger/10 flex items-center justify-center mx-auto mb-4">
+                        <span class="text-danger text-2xl font-bold">!</span>
+                    </div>
+                    <h1 class="text-xl font-bold text-content mb-2">Failed to load Sceless</h1>
+                    <p class="text-content-muted text-sm mb-3">Could not fetch your course data from SCELE.</p>
+                    {bootError && (
+                        <p class="text-xs text-content-muted font-mono bg-page-secondary border border-edge rounded px-3 py-2 mb-6 text-left break-all">
+                            {bootError}
+                        </p>
+                    )}
+                    <button
+                        onClick={() => window.location.reload()}
+                        class="px-4 py-2 bg-primary text-on-primary rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                    >
+                        Try again
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (appState === 'checking_auth' || appState === 'booting_data') {
         // Keeps the UI locked while background data is fetching

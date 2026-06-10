@@ -1,5 +1,7 @@
 import { toBlob as htmlToImageBlob } from "html-to-image";
 import { h, render as renderPreact } from "preact";
+import interRegularUrl from "@/src/assets/fonts/inter-v20-latin/inter-v20-latin-regular.woff2?url";
+import inter600Url from "@/src/assets/fonts/inter-v20-latin/inter-v20-latin-600.woff2?url";
 import { changeTheme, theme } from "@/src/stores/theme";
 import { Logo } from "@/src/components/ui/Logo";
 import { defaultThemes } from "@/src/types/themes";
@@ -9,6 +11,21 @@ import {
 	fetchImageBlob,
 	htmlFragmentToMarkdown,
 } from "@/src/helper/quizReview";
+
+const SCREENSHOT_FONT_CSS = `
+@font-face {
+	font-family: 'Inter';
+	font-style: normal;
+	font-weight: 400;
+	src: url(${interRegularUrl}) format('woff2');
+}
+@font-face {
+	font-family: 'Inter';
+	font-style: normal;
+	font-weight: 600;
+	src: url(${inter600Url}) format('woff2');
+}
+`;
 
 const QUESTION_BASE_CLASSES = new Set([
 	"que",
@@ -513,6 +530,14 @@ function waitForFrameImages(frameDocument: Document): Promise<void> {
 	).then(() => undefined);
 }
 
+function escapeHtml(text: string): string {
+	return text
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
+}
+
 async function exportQuizReviewPdf(options: {
 	shell: HTMLElement;
 	pageTitle: string;
@@ -520,74 +545,54 @@ async function exportQuizReviewPdf(options: {
 }): Promise<void> {
 	const { shell, pageTitle, courseName } = options;
 	const printableShell = buildPrintableShell(shell);
-	const iframe = document.createElement("iframe");
+	const nativeStyleText = document.getElementById(NATIVE_STYLE_ID)?.textContent ?? "";
 
+	const htmlContent = [
+		"<!doctype html><html><head>",
+		`<meta charset="utf-8" />`,
+		`<title>${escapeHtml(pageTitle)}</title>`,
+		nativeStyleText ? `<style>${nativeStyleText}</style>` : "",
+		`<style>${EXPORT_DOCUMENT_STYLES}</style>`,
+		"</head><body>",
+		`<div class="sceless-export-wrap">`,
+		`<header class="sceless-export-header">`,
+		`<p class="sceless-export-course">${escapeHtml(courseName)}</p>`,
+		`<h1 class="sceless-export-title">${escapeHtml(pageTitle)}</h1>`,
+		`</header>`,
+		`<div id="sceless-quiz-review-root">${printableShell.outerHTML}</div>`,
+		`</div>`,
+		"</body></html>",
+	].join("");
+
+	const blob = new Blob([htmlContent], { type: "text/html" });
+	const blobUrl = URL.createObjectURL(blob);
+
+	const iframe = document.createElement("iframe");
 	iframe.setAttribute("aria-hidden", "true");
-	iframe.style.position = "fixed";
-	iframe.style.right = "0";
-	iframe.style.bottom = "0";
-	iframe.style.width = "0";
-	iframe.style.height = "0";
-	iframe.style.opacity = "0";
-	iframe.style.border = "0";
-	iframe.style.pointerEvents = "none";
+	iframe.style.cssText =
+		"position:fixed;right:0;bottom:0;width:0;height:0;opacity:0;border:0;pointer-events:none;";
+	iframe.src = blobUrl;
 	document.body.append(iframe);
 
-	const frameWindow = iframe.contentWindow;
-	const frameDocument = iframe.contentDocument;
+	await new Promise<void>((resolve) => {
+		iframe.addEventListener("load", () => resolve(), { once: true });
+		window.setTimeout(resolve, 3000);
+	});
 
-	if (!frameWindow || !frameDocument) {
+	const frameWindow = iframe.contentWindow;
+
+	if (!frameWindow) {
 		iframe.remove();
+		URL.revokeObjectURL(blobUrl);
 		return;
 	}
 
-	frameDocument.open();
-	frameDocument.write("<!doctype html><html><head><meta charset='utf-8' /></head><body></body></html>");
-	frameDocument.close();
-
-	const pageTitleElement = frameDocument.createElement("title");
-	pageTitleElement.textContent = pageTitle;
-	frameDocument.head.append(pageTitleElement);
-
-	const nativeStyleText = document.getElementById(NATIVE_STYLE_ID)?.textContent ?? "";
-	if (nativeStyleText) {
-		const inheritedStyle = frameDocument.createElement("style");
-		inheritedStyle.textContent = nativeStyleText;
-		frameDocument.head.append(inheritedStyle);
-	}
-
-	const exportStyle = frameDocument.createElement("style");
-	exportStyle.textContent = EXPORT_DOCUMENT_STYLES;
-	frameDocument.head.append(exportStyle);
-
-	const exportWrap = frameDocument.createElement("div");
-	exportWrap.className = "sceless-export-wrap";
-
-	const exportHeader = frameDocument.createElement("header");
-	exportHeader.className = "sceless-export-header";
-
-	const exportCourse = frameDocument.createElement("p");
-	exportCourse.className = "sceless-export-course";
-	exportCourse.textContent = courseName;
-
-	const exportTitle = frameDocument.createElement("h1");
-	exportTitle.className = "sceless-export-title";
-	exportTitle.textContent = pageTitle;
-
-	exportHeader.append(exportCourse, exportTitle);
-
-	const exportRoot = frameDocument.createElement("div");
-	exportRoot.id = "sceless-quiz-review-root";
-	exportRoot.append(frameDocument.importNode(printableShell, true));
-
-	exportWrap.append(exportHeader, exportRoot);
-	frameDocument.body.append(exportWrap);
-
-	await waitForFrameImages(frameDocument);
+	await waitForFrameImages(frameWindow.document);
 
 	const cleanup = () => {
 		window.setTimeout(() => {
 			iframe.remove();
+			URL.revokeObjectURL(blobUrl);
 		}, 250);
 	};
 
@@ -749,6 +754,7 @@ async function copyQuestionImage(context: NativeQuestionContext): Promise<boolea
 			cacheBust: true,
 			pixelRatio: Math.min(window.devicePixelRatio || 2, 2),
 			backgroundColor: captureBackground,
+			fontEmbedCSS: SCREENSHOT_FONT_CSS,
 			filter: (node) =>
 				!(
 					node instanceof HTMLElement &&
