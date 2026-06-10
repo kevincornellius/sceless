@@ -83,7 +83,6 @@ const App = () => {
         if (appState === 'booting_data') {
             const bootCoreData = async () => {
                 try {
-                    console.log("Bootstrapping core application data...");
                     await loadSiteInfo();
                     await loadCourses();
                     await initPinnedCoursesStore();

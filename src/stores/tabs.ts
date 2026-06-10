@@ -19,7 +19,6 @@ export const add = async (tab: Tab) => {
 	const exists = openTabs.value.some((t) => getTabKey(t) === tabKey);
 
 	if (!exists) {
-		console.log(`Adding new tab: ${tabKey}`);
 		const newTabsList = [...openTabs.value, tab];
 		openTabs.value = newTabsList;
 		await tabsStorage.setValue(newTabsList);
@@ -70,12 +69,6 @@ export async function initStore() {
 	);
 	document.title = activeTab?.title ?? "Sceless";
 
-	console.log(
-		"Initialized tabs store with tabs:",
-		initialTabs,
-		"and active tab:",
-		activeTabKey.value,
-	);
 	openTabsLoaded.value = true;
 
 	tabsStorage.watch((newTabs) => {

@@ -13,12 +13,10 @@ export async function setCachedNotifications(notifications: AppNotification[]): 
 }
 
 export async function getCacheTimestamp(): Promise<number | null> {
-console.log(`Retrieving cache timestamp for key: ${CACHE_KEY}: ${await db.getTimestamp("cache", CACHE_KEY)}`);
   return db.getTimestamp("cache", CACHE_KEY);
 }
 
 export async function isCacheValid(): Promise<boolean> {
-console.log(`Checking cache validity: ${CACHE_KEY} - TTL: ${CACHE_TTL}ms`);
   const timestamp = await getCacheTimestamp();
   if (!timestamp) return false;
   return Date.now() - timestamp < CACHE_TTL;

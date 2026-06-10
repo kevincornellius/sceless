@@ -1,4 +1,5 @@
 import tailwindCss from "@/src/assets/tailwind.css?inline";
+import fontCss from "@/src/assets/fonts/plus-jakarta-sans.css?inline";
 import { quizReviewHijackStorage } from "@/src/storage";
 import { initializeTheme } from "@/src/stores/theme";
 import { buildQuizReviewPayloadFromDom } from "@/src/helper/quizReviewDom";
@@ -1072,11 +1073,10 @@ export default defineContentScript({
 			ensureStyles();
 
 			if (!document.getElementById("sceless-quiz-font")) {
-				const fontLink = document.createElement("link");
-				fontLink.id = "sceless-quiz-font";
-				fontLink.rel = "stylesheet";
-				fontLink.href = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900&display=swap";
-				document.head.appendChild(fontLink);
+				const fontStyle = document.createElement("style");
+				fontStyle.id = "sceless-quiz-font";
+				fontStyle.textContent = fontCss;
+				document.head.appendChild(fontStyle);
 			}
 
 			await initializeTheme();

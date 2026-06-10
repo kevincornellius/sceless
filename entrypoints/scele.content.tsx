@@ -12,15 +12,12 @@ export default defineContentScript({
 	cssInjectionMode: "manual",
 
 	async main() {
-		console.log("[sceless] Content script main() running on:", window.location.href);
-
 		// Mark synchronously (before any await) so scele-mod can detect SPA takeover
 		document.documentElement.setAttribute('data-sceless-spa', '');
 
 		const enabled = (await enabledStorage.getValue()) ?? true;
 
 		if (!enabled) {
-			console.log("[sceless] Extension disabled. Skipping.");
 			return;
 		}
 
@@ -31,10 +28,7 @@ export default defineContentScript({
 		);
 
 		
-		console.log("[sceless] Content script loaded.");
-
 		const executePurge = () => {
-			console.log("[sceless] Executing Clean Purge...");
 
 			window.stop();
 
