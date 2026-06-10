@@ -107,6 +107,14 @@ const Sidebar = () => {
 		const active = activeTabKey.value === key;
 		const Icon = icon;
 		const newCount = tab.type === "course" ? ((newModuleCounts.value ?? {})[tab.id] ?? 0) : 0;
+		const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null);
+
+		const handleMouseEnter = (e: MouseEvent) => {
+			const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+			setTooltip({ top: rect.top + rect.height / 2, left: rect.right + 8 });
+		};
+
+		const handleMouseLeave = () => setTooltip(null);
 
 		const handleClick = (e: MouseEvent) => {
 			// Open in new tab with ctrl/cmd key
@@ -124,19 +132,21 @@ const Sidebar = () => {
 		};
 
 		return (
+			<>
 			<a
 				href={TabToUrl(tab)}
 				onClick={(e) => {
 					e.preventDefault();
 					handleClick(e);
 				}}
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
 				target="_blank"
 				class={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
 					active
 						? "bg-primary text-on-primary"
 						: "text-content-muted hover:text-content hover:bg-primary/10"
 				}`}
-                title={tab.title}
 			>
 				<Icon width={18} class="shrink-0" />
 				{!expanded && newCount > 0 && (
@@ -189,6 +199,21 @@ const Sidebar = () => {
 					)
 				)}
 			</a>
+			{tooltip && (
+				<div
+					style={{
+						position: "fixed",
+						top: `${tooltip.top}px`,
+						left: `${tooltip.left}px`,
+						transform: "translateY(-50%)",
+						zIndex: 9999,
+					}}
+					class="px-2.5 py-1 bg-content text-page text-xs font-semibold rounded-md shadow-lg pointer-events-none whitespace-nowrap"
+				>
+					{tab.title}
+				</div>
+			)}
+			</>
 		);
 	};
 
