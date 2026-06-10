@@ -371,7 +371,9 @@ const Navbar = () => {
                   <ThemeSelector />
 
                   <a
-                      href="mailto:kevcornellius@gmail.com?subject=Sceless%20Feedback%20%2F%20Bug%20Report"
+                      href="https://sceless.cornellius.dev/feedback"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       title="Report a bug or send feedback"
                       class="p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-edge hover:text-content transition-all"
                   >
