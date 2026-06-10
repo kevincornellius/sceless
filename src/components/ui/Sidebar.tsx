@@ -12,11 +12,30 @@ import { useEffect, useState } from "preact/hooks";
 import { Logo, LogoL } from "./Logo";
 import {
 	BookOpen,
+	CalendarDays,
 	ChevronLeft,
-	LayoutDashboardIcon,
+	ClipboardList,
+	FileText,
+	LayoutDashboard,
+	Library,
 	Menu,
+	MessageSquare,
+	Settings,
 	X,
 } from "lucide-preact";
+
+function getTabIcon(type: string) {
+	switch (type) {
+		case "dashboard":   return LayoutDashboard;
+		case "tasks":       return CalendarDays;
+		case "course":      return BookOpen;
+		case "settings":    return Settings;
+		case "all-courses": return Library;
+		case "quiz-review": return ClipboardList;
+		case "forum":       return MessageSquare;
+		default:            return FileText;
+	}
+}
 import { ACTION_TABS } from "@/src/constants/navigation";
 import { Tab } from "@/src/types/state";
 import { newModuleCounts } from "@/src/stores/seenModules";
@@ -102,10 +121,10 @@ const Sidebar = () => {
 		</div>
 	);
 
-	const TabBar = ({ tab, icon, closable }: { tab: Tab; icon: any, closable: boolean }) => {
+	const TabBar = ({ tab, closable }: { tab: Tab; closable: boolean }) => {
 		const key = getTabKey(tab);
 		const active = activeTabKey.value === key;
-		const Icon = icon;
+		const Icon = getTabIcon(tab.type);
 		const newCount = tab.type === "course" ? ((newModuleCounts.value ?? {})[tab.id] ?? 0) : 0;
 		const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null);
 
@@ -230,7 +249,7 @@ const Sidebar = () => {
 				)}
 				<div class="flex flex-col gap-0.5 px-2">
 					{ACTION_TABS.map((tab) => (
-						<TabBar tab={tab} icon={LayoutDashboardIcon} closable={false} />
+						<TabBar tab={tab} closable={false} />
 					))}
 				</div>
 				<span class="border-t border-edge mx-2 my-2" />
@@ -261,7 +280,7 @@ const Sidebar = () => {
 				)}
 				<div class="flex flex-col gap-0.5 px-2">
 					{pinnedTabs.map((tab) => (
-						<TabBar tab={tab} icon={BookOpen} closable={false} />
+						<TabBar tab={tab} closable={false} />
 					))}
 				</div>
 				<span class="border-t border-edge mx-2 my-2" />
@@ -309,7 +328,6 @@ const Sidebar = () => {
 						<TabBar
 							key={getTabKey(tab)}
 							tab={tab}
-							icon={BookOpen}
 							closable={true}
 						/>
 					))}
