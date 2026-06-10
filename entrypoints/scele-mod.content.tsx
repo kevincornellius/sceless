@@ -393,6 +393,7 @@ export default defineContentScript({
 		"*://scele.cs.ui.ac.id/mod/**",
 		"*://scele.cs.ui.ac.id/course/**",
 		"*://scele.cs.ui.ac.id/enrol/**",
+		"*://scele.cs.ui.ac.id/grade/**",
 		"*://scele.cs.ui.ac.id/user/**",
 	],
 	excludeMatches: ["*://scele.cs.ui.ac.id/mod/quiz/review.php*"],
