@@ -14,12 +14,13 @@ export const closeAllDropdowns = () => {
 };
 import type { Profile as ProfileType } from "@/src/types/profile";
 import type { AppNotification } from "@/src/types/scele";
-import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon, Settings, Flag } from "lucide-preact";
+import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon, Settings, Flag, Sparkles } from "lucide-preact";
 import { logout } from "@/src/stores/auth";
 import { theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes, type ThemeConfig } from "@/src/types/themes";
 import { CourseDetailTab } from "@/src/pages/CourseDetailPage";
 import { SettingsTab } from "@/src/pages/SettingsPage";
+import { WrappedTab } from "@/src/pages/WrappedPage";
 import { navigateTab } from "@/src/routing/router";
 import { db } from "@/src/stores/indexeddb/db";
 
@@ -431,6 +432,14 @@ const Navbar = () => {
 				  <Notifications />
 
                   <ThemeSelector />
+
+                  <button
+                      onClick={() => navigateTab(WrappedTab)}
+                      title="Sceless Wrapped"
+                      class="p-2 rounded-lg bg-page text-csontent-muted border-2 border-edge hover:bg-edge hover:text-content transition-all cursor-pointer"
+                  >
+                      <Sparkles class="w-4 h-4" />
+                  </button>
 
                   <a
                       href="https://sceless.cornellius.dev/feedback"

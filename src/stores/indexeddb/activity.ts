@@ -85,10 +85,12 @@ export const trackCourseVisit = (courseId: number): void => {
 };
 
 export const trackModuleClick = (modname: string, dueDate: Date | null): void => {
+    const key = modname.trim().toLowerCase();
+    if (!key) return;
     const now = new Date();
     void update(s => {
         tickActivity(s, now);
-        s.moduleTypeClicks[modname] = (s.moduleTypeClicks[modname] ?? 0) + 1;
+        s.moduleTypeClicks[key] = (s.moduleTypeClicks[key] ?? 0) + 1;
         if (dueDate) {
             const msUntilDue = dueDate.getTime() - Date.now();
             if (msUntilDue > 0 && msUntilDue < 2 * 60 * 60 * 1000) s.lastMinuteOpens++;

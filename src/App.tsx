@@ -6,6 +6,7 @@ import SettingsPage from "./pages/SettingsPage";
 import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
 import AllCoursesPage from "./pages/AllCoursesPage";
+import WrappedPage from "./pages/WrappedPage";
 import { theme, initializeTheme } from "./stores/theme";
 import { initNavigation, navigateTab, markBootComplete } from "./routing/router";
 import { initAuthStore, wsToken } from "./stores/auth";
@@ -37,6 +38,8 @@ const getPageFromActiveTabKey = (): ComponentChildren => {
 			return <SettingsPage />;
 		case "all-courses":
 			return <AllCoursesPage />;
+		case "wrapped":
+			return <WrappedPage />;
 		default:
 			return <DashboardPage />;
 	}

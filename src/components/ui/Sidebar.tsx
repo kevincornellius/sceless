@@ -21,6 +21,7 @@ import {
 	Menu,
 	MessageSquare,
 	Settings,
+	Sparkles,
 	X,
 } from "lucide-preact";
 
@@ -33,6 +34,7 @@ function getTabIcon(type: string) {
 		case "all-courses": return Library;
 		case "quiz-review": return ClipboardList;
 		case "forum":       return MessageSquare;
+		case "wrapped":     return Sparkles;
 		default:            return FileText;
 	}
 }

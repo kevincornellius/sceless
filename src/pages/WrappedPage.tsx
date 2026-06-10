@@ -1,71 +1,188 @@
-import { useState, useRef, useCallback } from "preact/hooks";
+import { useState, useRef, useCallback, useEffect } from "preact/hooks";
 import {
-    Trophy, Flame, BookOpen, AlertCircle, CheckCircle,
+    Trophy, Flame, BookOpen, AlertCircle,
     Zap, Star, TrendingUp, Download, Share2, ChevronDown, Moon, Sun,
 } from "lucide-preact";
 import { theme } from "../stores/theme";
+import type { ThemeConfig } from "../types/themes";
+import type { Tab } from "../types/state";
+import { SCELE_URL } from "../config";
+import { getActivityStats } from "../stores/indexeddb/activity";
+import { loadSiteInfo } from "../stores/indexeddb/siteinfo";
+import { courses } from "../stores/indexeddb/course";
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-// Real shape: derived from deadline cache + block_recentlyaccesseditems + core_course_get_recent_courses
-
-const MOCK = {
-    semester:       "Even 2024/2025",
-    userName:       "Kevin",
-    totalCourses:   8,
-    totalDeadlines: 47,
-    onTime:         38,
-    overdue:        9,
-    busiestMonth:   { name: "October", count: 14 },
-    busiestWeek:    "Week 3 of October",
-    topCourses: [
-        { name: "Basis Data",        count: 12 },
-        { name: "Sistem Operasi",    count: 10 },
-        { name: "Pemrogaman Lanjut", count:  8 },
-    ],
-    // from block_recentlyaccesseditems_get_recent_items (timeaccess timestamps)
-    accessByHour: [
-        // index = hour 0–23, value = relative frequency 0–100
-        5, 2, 8, 14, 3, 1, 2, 4, 12, 18, 22, 25,
-        30, 28, 20, 18, 22, 35, 48, 60, 72, 55, 38, 20,
-    ],
-    midnightSessions: 23,       // accesses between 00:00–04:00
-    peakHour:         21,       // 21:00 = 9 PM
-    mostVisitedCourse: "Basis Data",
-    mostAccessedModule: { type: "assign", label: "Assignments" },
-    nightOwlPct: 42,            // % of accesses after 10 PM
-    longestStreak:  { value: "18 days", month: "November" },
-    personality:    "Night Owl",
-    personalityDesc: "42% of your SCELE activity happens after 10 PM. The night is your study hall.",
+export const WrappedTab: Tab = {
+    type: "wrapped",
+    id: "page",
+    title: "Wrapped",
+    url: `${SCELE_URL}/local/sceless/wrapped`,
 };
 
-const onTimePct = Math.round((MOCK.onTime / MOCK.totalDeadlines) * 100);
-
-// ── Theme CSS variable shortcuts ──────────────────────────────────────────────
+// ── CSS variable shortcuts ────────────────────────────────────────────────────
 
 const css = {
-    primary:         "var(--theme-primary)",
-    onPrimary:       "var(--theme-on-primary)",
-    page:            "var(--theme-page)",
-    pageSec:         "var(--theme-page-secondary)",
-    edge:            "var(--theme-edge)",
-    content:         "var(--theme-content)",
-    muted:           "var(--theme-content-muted)",
-    danger:          "var(--theme-danger)",
-    highlight:       "var(--theme-highlight)",
-    primaryA12:      "color-mix(in srgb, var(--theme-primary) 12%, transparent)",
-    primaryA20:      "color-mix(in srgb, var(--theme-primary) 20%, transparent)",
-    onPrimaryA60:    "color-mix(in srgb, var(--theme-on-primary) 60%, transparent)",
-    onPrimaryA30:    "color-mix(in srgb, var(--theme-on-primary) 30%, transparent)",
-    dangerA12:       "color-mix(in srgb, var(--theme-danger) 12%, transparent)",
-    highlightA20:    "color-mix(in srgb, var(--theme-highlight) 20%, transparent)",
+    primary:      "var(--theme-primary)",
+    onPrimary:    "var(--theme-on-primary)",
+    page:         "var(--theme-page)",
+    pageSec:      "var(--theme-page-secondary)",
+    edge:         "var(--theme-edge)",
+    content:      "var(--theme-content)",
+    muted:        "var(--theme-content-muted)",
+    danger:       "var(--theme-danger)",
+    highlight:    "var(--theme-highlight)",
+    primaryA12:   "color-mix(in srgb, var(--theme-primary) 12%, transparent)",
+    primaryA20:   "color-mix(in srgb, var(--theme-primary) 20%, transparent)",
+    onPrimaryA60: "color-mix(in srgb, var(--theme-on-primary) 60%, transparent)",
+    onPrimaryA30: "color-mix(in srgb, var(--theme-on-primary) 30%, transparent)",
+    dangerA12:    "color-mix(in srgb, var(--theme-danger) 12%, transparent)",
+    highlightA20: "color-mix(in srgb, var(--theme-highlight) 20%, transparent)",
 };
+
+// ── Derived data helpers ──────────────────────────────────────────────────────
+
+function calculateLongestStreak(activeDays: string[]): { days: number; monthLabel: string } {
+    if (activeDays.length === 0) return { days: 0, monthLabel: "" };
+    const sorted = [...activeDays].sort();
+    let best = 1, current = 1, bestEnd = sorted[0];
+    for (let i = 1; i < sorted.length; i++) {
+        const diff = (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86400000;
+        if (diff === 1) { current++; if (current > best) { best = current; bestEnd = sorted[i]; } }
+        else current = 1;
+    }
+    const monthLabel = new Date(bestEnd + "T12:00:00").toLocaleDateString("en-US", { month: "long" });
+    return { days: best, monthLabel };
+}
+
+function busiestMonth(dailyActivity: Record<string, number>): { name: string; count: number } {
+    const byMonth: Record<string, number> = {};
+    for (const [date, count] of Object.entries(dailyActivity)) {
+        const key = date.slice(0, 7); // "2026-06"
+        byMonth[key] = (byMonth[key] ?? 0) + count;
+    }
+    const top = Object.entries(byMonth).sort(([, a], [, b]) => b - a)[0];
+    if (!top) return { name: "—", count: 0 };
+    const [year, month] = top[0].split("-");
+    const label = new Date(Number(year), Number(month) - 1, 1).toLocaleDateString("en-US", { month: "long" });
+    return { name: label, count: top[1] };
+}
+
+interface SlideData {
+    userName: string;
+    activeDays: number;
+    totalActions: number;
+    hourly: number[];
+    weekday: number[];
+    midnightSessions: number;    // raw count
+    midnightPct: number;         // % of total activity
+    peakHour: number;
+    nightOwlPct: number;
+    longestStreak: { days: number; monthLabel: string };
+    busiest: { name: string; count: number };
+    topCourses: { name: string; count: number }[];
+    topModule: { type: string; count: number } | null;
+    moduleTypeClicks: Record<string, number>;
+    topTheme: string | null;
+    themeBreakdown: { name: string; totalMs: number }[];
+    themeChanges: number;
+    quizReviews: number;
+    lastMinuteOpens: number;
+    tabSwitches: number;
+    busiestDayCount: number;
+    weekendPct: number;
+    isWeekendWarrior: boolean;
+    personality: string;
+    personalityDesc: string;
+}
+
+async function buildSlideData(): Promise<SlideData> {
+    const [stats, { info }] = await Promise.all([getActivityStats(), loadSiteInfo()]);
+
+    const moduleClicksTotal = Object.values(stats.moduleTypeClicks).reduce((a, b) => a + b, 0);
+    const totalActions = stats.tabSwitchCount + moduleClicksTotal + stats.quizReviewsOpened;
+    const hourlyTotal = stats.hourly.reduce((a, b) => a + b, 0);
+    const midnightSessions = stats.hourly.slice(0, 4).reduce((a, b) => a + b, 0);
+    const midnightPct = hourlyTotal > 0 ? Math.round((midnightSessions / hourlyTotal) * 100) : 0;
+    const peakHour = stats.hourly.indexOf(Math.max(...stats.hourly));
+    const afterTenPm = stats.hourly.slice(22).reduce((a, b) => a + b, 0);
+    const nightOwlPct = hourlyTotal > 0 ? Math.round((afterTenPm / hourlyTotal) * 100) : 0;
+
+    const topCourseEntries = Object.entries(stats.courseVisits)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([id, count]) => ({
+            name: courses.value.find(c => c.id === Number(id))?.code ?? `Course ${id}`,
+            count,
+        }));
+
+    const topModuleEntry = Object.entries(stats.moduleTypeClicks).sort(([, a], [, b]) => b - a)[0];
+    const topModule = topModuleEntry ? { type: topModuleEntry[0], count: topModuleEntry[1] } : null;
+
+    const now = Date.now();
+    const themeBreakdown = Object.entries(stats.themeUsage)
+        .map(([name, u]) => ({ name, totalMs: u.totalMs + (u.lastUsed ? Math.min(now - u.lastUsed, 4 * 3600000) : 0) }))
+        .filter(e => e.totalMs > 0)
+        .sort((a, b) => b.totalMs - a.totalMs);
+    const topTheme = themeBreakdown[0]?.name ?? null;
+
+    const busiestEntry = Object.entries(stats.dailyActivity ?? {}).sort(([, a], [, b]) => b - a)[0];
+    const busiestDayCount = busiestEntry?.[1] ?? 0;
+
+    const weekendTotal = stats.weekday[0] + stats.weekday[6];
+    const weekdayTotal = stats.weekday.slice(1, 6).reduce((a, b) => a + b, 0);
+    const totalWeekActivity = weekendTotal + weekdayTotal;
+    const weekendPct = totalWeekActivity > 0 ? Math.round((weekendTotal / totalWeekActivity) * 100) : 0;
+    const isWeekendWarrior = weekdayTotal > 0 ? (weekendTotal / 2) > (weekdayTotal / 5) : false;
+
+    const streak = calculateLongestStreak(stats.activeDays);
+
+    const personality = nightOwlPct >= 35 ? "Night Owl"
+        : stats.lastMinuteOpens > 5 ? "Deadline Fighter"
+        : streak.days > 7 ? "Consistent Grinder"
+        : "Steady Explorer";
+
+    const personalityDesc = personality === "Night Owl"
+        ? `${nightOwlPct}% of your SCELE activity happens after 10 PM. The night is your study hall.`
+        : personality === "Deadline Fighter"
+        ? `You've opened ${stats.lastMinuteOpens} tasks within 2 hours of their deadline. You thrive under pressure.`
+        : personality === "Consistent Grinder"
+        ? `You logged in for ${streak.days} days straight. Discipline is your superpower.`
+        : `You've visited ${stats.activeDays.length} different days consistently${topTheme ? `, mostly with the ${topTheme} theme` : ""}. Balanced approach.`;
+
+    return {
+        userName: info?.name.split(" ")[0] ?? "You",
+        activeDays: stats.activeDays.length,
+        totalActions,
+        hourly: stats.hourly,
+        weekday: stats.weekday,
+        midnightSessions,
+        midnightPct,
+        peakHour,
+        nightOwlPct,
+        longestStreak: streak,
+        busiest: busiestMonth(stats.dailyActivity ?? {}),
+        topCourses: topCourseEntries,
+        topModule,
+        moduleTypeClicks: stats.moduleTypeClicks,
+        topTheme,
+        themeBreakdown,
+        themeChanges: stats.themeChanges,
+        quizReviews: stats.quizReviewsOpened,
+        lastMinuteOpens: stats.lastMinuteOpens,
+        tabSwitches: stats.tabSwitchCount,
+        busiestDayCount,
+        weekendPct,
+        isWeekendWarrior,
+        personality,
+        personalityDesc,
+    };
+}
 
 // ── Layout helpers ────────────────────────────────────────────────────────────
 
 function Slide({ children, bg }: { children: any; bg?: string }) {
     return (
         <div
-            class="snap-start min-h-screen w-full flex flex-col items-center justify-center px-8 py-20"
+            class="snap-start h-full w-full flex flex-col items-center justify-center px-8 py-16"
             style={{ backgroundColor: bg ?? css.page }}
         >
             {children}
@@ -86,7 +203,7 @@ function Tag({ children }: { children: any }) {
 
 // ── Slides ────────────────────────────────────────────────────────────────────
 
-function HeroSlide() {
+function HeroSlide({ d }: { d: SlideData }) {
     return (
         <Slide bg={css.primary}>
             <div class="flex flex-col items-center gap-8 text-center max-w-xs">
@@ -95,13 +212,13 @@ function HeroSlide() {
                 </div>
                 <div class="flex flex-col gap-3">
                     <span class="text-[10px] font-black uppercase tracking-widest" style={{ color: css.onPrimaryA60 }}>
-                        Your Semester Recap
+                        Your SCELE story
                     </span>
                     <h1 class="text-5xl font-black leading-tight" style={{ color: css.onPrimary }}>
                         Sceless<br />Wrapped
                     </h1>
                     <p class="text-sm font-semibold" style={{ color: css.onPrimaryA60 }}>
-                        {MOCK.semester} · {MOCK.userName}
+                        {d.activeDays} active days · {d.userName}
                     </p>
                 </div>
                 <div class="flex flex-col items-center gap-1 animate-bounce">
@@ -113,41 +230,49 @@ function HeroSlide() {
     );
 }
 
-function OverviewSlide() {
+function OverviewSlide({ d }: { d: SlideData }) {
     return (
         <Slide>
             <div class="flex flex-col gap-8 max-w-sm w-full">
                 <div class="flex flex-col gap-3">
                     <Tag>This semester</Tag>
                     <h2 class="text-4xl font-black leading-snug" style={{ color: css.content }}>
-                        You faced<br />{MOCK.totalDeadlines} deadlines
+                        You made<br />{d.totalActions.toLocaleString()} actions
                     </h2>
                 </div>
                 <div class="flex flex-col gap-4">
                     <div class="p-6 rounded-2xl flex items-center gap-5" style={{ backgroundColor: css.primary }}>
                         <BookOpen class="w-10 h-10 shrink-0" style={{ color: css.onPrimary, opacity: 0.8 }} />
                         <div>
-                            <p class="text-6xl font-black" style={{ color: css.onPrimary }}>{MOCK.totalCourses}</p>
-                            <p class="text-sm font-semibold" style={{ color: css.onPrimaryA60 }}>active courses</p>
+                            <p class="text-6xl font-black" style={{ color: css.onPrimary }}>{d.activeDays}</p>
+                            <p class="text-sm font-semibold" style={{ color: css.onPrimaryA60 }}>active days</p>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div class="p-4 rounded-xl flex flex-col gap-1.5" style={{ backgroundColor: css.primaryA12, border: `1px solid ${css.edge}` }}>
-                            <CheckCircle class="w-5 h-5" style={{ color: css.primary }} />
-                            <p class="text-3xl font-black" style={{ color: css.content }}>{MOCK.onTime}</p>
-                            <p class="text-xs font-semibold" style={{ color: css.muted }}>on time</p>
+                            <TrendingUp class="w-5 h-5" style={{ color: css.primary }} />
+                            <p class="text-3xl font-black" style={{ color: css.content }}>{d.tabSwitches}</p>
+                            <p class="text-xs font-semibold" style={{ color: css.muted }}>tab switches</p>
                         </div>
                         <div class="p-4 rounded-xl flex flex-col gap-1.5" style={{ backgroundColor: css.dangerA12, border: `1px solid ${css.edge}` }}>
                             <AlertCircle class="w-5 h-5" style={{ color: css.danger }} />
-                            <p class="text-3xl font-black" style={{ color: css.danger }}>{MOCK.overdue}</p>
-                            <p class="text-xs font-semibold" style={{ color: css.muted }}>overdue</p>
+                            <p class="text-3xl font-black" style={{ color: css.danger }}>{d.lastMinuteOpens}</p>
+                            <p class="text-xs font-semibold" style={{ color: css.muted }}>last-minute opens</p>
                         </div>
-                    </div>
-                    <div class="space-y-2">
-                        <div class="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: css.edge }}>
-                            <div class="absolute left-0 top-0 h-full rounded-full" style={{ width: `${onTimePct}%`, backgroundColor: css.primary }} />
+                        <div class="p-4 rounded-xl flex flex-col gap-1.5" style={{ backgroundColor: css.primaryA12, border: `1px solid ${css.edge}` }}>
+                            <Flame class="w-5 h-5" style={{ color: css.primary }} />
+                            <p class="text-3xl font-black" style={{ color: css.content }}>{d.busiestDayCount}</p>
+                            <p class="text-xs font-semibold" style={{ color: css.muted }}>actions on best day</p>
                         </div>
-                        <p class="text-xs text-center font-semibold" style={{ color: css.muted }}>{onTimePct}% on-time rate</p>
+                        <div class="p-4 rounded-xl flex flex-col gap-1.5" style={{ backgroundColor: css.highlightA20, border: `1px solid ${css.edge}` }}>
+                            <Zap class="w-5 h-5" style={{ color: css.highlight }} />
+                            <p class="text-3xl font-black" style={{ color: css.content }}>
+                                {d.weekendPct}%
+                            </p>
+                            <p class="text-xs font-semibold" style={{ color: css.muted }}>
+                                {d.isWeekendWarrior ? "weekend warrior 🎮" : "weekday grinder 💼"}
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -155,7 +280,7 @@ function OverviewSlide() {
     );
 }
 
-function BusiestSlide() {
+function BusiestSlide({ d }: { d: SlideData }) {
     return (
         <Slide bg={css.pageSec}>
             <div class="flex flex-col gap-8 max-w-sm w-full">
@@ -167,62 +292,62 @@ function BusiestSlide() {
                 </div>
                 <div class="p-10 rounded-2xl flex flex-col items-center gap-4 text-center" style={{ backgroundColor: css.primary }}>
                     <Flame class="w-12 h-12" style={{ color: css.onPrimary, opacity: 0.9 }} />
-                    <p class="text-7xl font-black leading-none" style={{ color: css.onPrimary }}>{MOCK.busiestMonth.name}</p>
+                    <p class="text-6xl font-black leading-none" style={{ color: css.onPrimary }}>{d.busiest.name}</p>
                     <p class="font-semibold text-base" style={{ color: css.onPrimaryA60 }}>
-                        {MOCK.busiestMonth.count} deadlines — {MOCK.busiestWeek} was brutal
+                        {d.busiest.count > 0 ? `${d.busiest.count} actions recorded` : "Keep using Sceless!"}
                     </p>
                 </div>
-                <p class="text-sm text-center" style={{ color: css.muted }}>
-                    That's more than 3 deadlines a week. You survived.
-                </p>
             </div>
         </Slide>
     );
 }
 
-function CoursesSlide() {
+function CoursesSlide({ d }: { d: SlideData }) {
     const barColors = [css.primary, css.highlight, css.danger];
-    const max = Math.max(...MOCK.topCourses.map(c => c.count));
+    const max = Math.max(...d.topCourses.map(c => c.count), 1);
     return (
         <Slide>
             <div class="flex flex-col gap-8 max-w-sm w-full">
                 <div class="flex flex-col gap-3">
-                    <Tag>Most demanding</Tag>
+                    <Tag>Most visited</Tag>
                     <h2 class="text-4xl font-black leading-snug" style={{ color: css.content }}>
                         Your top<br />courses
                     </h2>
                 </div>
-                <div class="flex flex-col gap-4">
-                    {MOCK.topCourses.map((c, i) => (
-                        <div key={c.name} class="flex flex-col gap-1.5">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-black" style={{ color: barColors[i] }}>#{i + 1}</span>
-                                    <span class="text-sm font-bold" style={{ color: css.content }}>{c.name}</span>
+                {d.topCourses.length > 0 ? (
+                    <div class="flex flex-col gap-4">
+                        {d.topCourses.map((c, i) => (
+                            <div key={c.name} class="flex flex-col gap-1.5">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-black" style={{ color: barColors[i] }}>#{i + 1}</span>
+                                        <span class="text-sm font-bold" style={{ color: css.content }}>{c.name}</span>
+                                    </div>
+                                    <span class="text-sm font-black" style={{ color: css.content }}>{c.count}×</span>
                                 </div>
-                                <span class="text-sm font-black" style={{ color: css.content }}>{c.count}</span>
+                                <div class="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: css.edge }}>
+                                    <div class="h-full rounded-full" style={{ width: `${(c.count / max) * 100}%`, backgroundColor: barColors[i] }} />
+                                </div>
                             </div>
-                            <div class="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: css.edge }}>
-                                <div
-                                    class="h-full rounded-full"
-                                    style={{ width: `${(c.count / max) * 100}%`, backgroundColor: barColors[i] }}
-                                />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <p class="text-xs text-center" style={{ color: css.muted }}>by number of deadlines</p>
+                        ))}
+                    </div>
+                ) : (
+                    <p class="text-sm" style={{ color: css.muted }}>Visit some courses to see your top picks.</p>
+                )}
+                {d.topModule && (
+                    <p class="text-xs text-center" style={{ color: css.muted }}>
+                        Top module type: <strong style={{ color: css.content }}>{d.topModule.type}</strong> ({d.topModule.count}×)
+                    </p>
+                )}
             </div>
         </Slide>
     );
 }
 
-function NightOwlSlide() {
-    const peak = MOCK.peakHour;
+function NightOwlSlide({ d }: { d: SlideData }) {
+    const peak = d.peakHour;
     const peakLabel = peak === 0 ? "midnight" : peak < 12 ? `${peak} AM` : peak === 12 ? "noon" : `${peak - 12} PM`;
-    const maxBar = Math.max(...MOCK.accessByHour);
-
-    // only render every-other hour label to avoid crowding
+    const maxBar = Math.max(...d.hourly, 1);
     const hourLabels = ["12a","","2a","","4a","","6a","","8a","","10a","","12p","","2p","","4p","","6p","","8p","","10p",""];
 
     return (
@@ -234,17 +359,15 @@ function NightOwlSlide() {
                         You peak at<br />{peakLabel} 🌙
                     </h2>
                 </div>
-
-                {/* 24-hour activity bar chart */}
                 <div class="flex flex-col gap-2">
                     <div class="flex items-end gap-px h-20 w-full">
-                        {MOCK.accessByHour.map((v, h) => {
+                        {d.hourly.map((v, h) => {
                             const isNight = h >= 22 || h < 4;
                             const isPeak  = h === peak;
                             return (
                                 <div
                                     key={h}
-                                    class="flex-1 rounded-sm transition-all"
+                                    class="flex-1 rounded-sm"
                                     style={{
                                         height: `${Math.max(4, (v / maxBar) * 100)}%`,
                                         backgroundColor: isPeak ? css.primary : isNight ? css.highlight : css.edge,
@@ -260,17 +383,16 @@ function NightOwlSlide() {
                         ))}
                     </div>
                 </div>
-
                 <div class="grid grid-cols-2 gap-3">
                     <div class="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: css.primaryA12 }}>
                         <Moon class="w-5 h-5" style={{ color: css.primary }} />
-                        <p class="text-2xl font-black" style={{ color: css.content }}>{MOCK.nightOwlPct}%</p>
-                        <p class="text-xs font-semibold" style={{ color: css.muted }}>activity after 10 PM</p>
+                        <p class="text-2xl font-black" style={{ color: css.content }}>{d.nightOwlPct}%</p>
+                        <p class="text-xs font-semibold" style={{ color: css.muted }}>after 10 PM</p>
                     </div>
                     <div class="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: css.highlightA20 }}>
                         <Sun class="w-5 h-5" style={{ color: css.highlight }} />
-                        <p class="text-2xl font-black" style={{ color: css.content }}>{MOCK.midnightSessions}</p>
-                        <p class="text-xs font-semibold" style={{ color: css.muted }}>midnight sessions</p>
+                        <p class="text-2xl font-black" style={{ color: css.content }}>{d.midnightPct}%</p>
+                        <p class="text-xs font-semibold" style={{ color: css.muted }}>midnight activity</p>
                     </div>
                 </div>
             </div>
@@ -278,7 +400,7 @@ function NightOwlSlide() {
     );
 }
 
-function MidnightSlide() {
+function MidnightSlide({ d }: { d: SlideData }) {
     return (
         <Slide bg={css.primary}>
             <div class="flex flex-col gap-8 max-w-sm w-full items-center text-center">
@@ -288,25 +410,24 @@ function MidnightSlide() {
                         Midnight grind
                     </span>
                     <h2 class="text-6xl font-black leading-tight" style={{ color: css.onPrimary }}>
-                        {MOCK.midnightSessions}<br /><span class="text-3xl">late nights</span>
+                        {d.midnightPct}%<br /><span class="text-3xl">midnight activity</span>
                     </h2>
                     <p class="font-medium text-base" style={{ color: css.onPrimaryA60 }}>
                         You opened SCELE between<br />
-                        <strong style={{ color: css.onPrimary }}>midnight and 4 AM</strong> this semester.<br />
+                        <strong style={{ color: css.onPrimary }}>midnight and 4 AM</strong>.<br />
                         Sleep is optional apparently.
                     </p>
                 </div>
                 <div class="flex gap-3">
-                    {["🍵", "☕", "💻"].map(e => (
-                        <span key={e} class="text-3xl">{e}</span>
-                    ))}
+                    {["🍵", "☕", "💻"].map(e => <span key={e} class="text-3xl">{e}</span>)}
                 </div>
             </div>
         </Slide>
     );
 }
 
-function StreakSlide() {
+function StreakSlide({ d }: { d: SlideData }) {
+    const { days, monthLabel } = d.longestStreak;
     return (
         <Slide bg={css.pageSec}>
             <div class="flex flex-col gap-8 max-w-sm w-full items-center text-center">
@@ -315,25 +436,84 @@ function StreakSlide() {
                 </div>
                 <div class="flex flex-col gap-3 items-center">
                     <Tag>Best streak</Tag>
-                    <h2 class="text-6xl font-black" style={{ color: css.content }}>{MOCK.longestStreak.value}</h2>
-                    <p class="font-medium" style={{ color: css.muted }}>without a single overdue deadline</p>
-                    <span class="text-sm font-black" style={{ color: css.primary }}>{MOCK.longestStreak.month}</span>
+                    <h2 class="text-6xl font-black" style={{ color: css.content }}>{days > 0 ? `${days} days` : "—"}</h2>
+                    <p class="font-medium" style={{ color: css.muted }}>consecutive days on SCELE</p>
+                    {monthLabel && <span class="text-sm font-black" style={{ color: css.primary }}>{monthLabel}</span>}
                 </div>
             </div>
         </Slide>
     );
 }
 
-function PersonalitySlide() {
-    const isNight = MOCK.personality === "Night Owl";
+function ThemeSlide({ d }: { d: SlideData }) {
+    const total = d.themeBreakdown.reduce((s, e) => s + e.totalMs, 0);
+    const formatMs = (ms: number) => {
+        const h = Math.floor(ms / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    };
+
+    return (
+        <Slide bg={css.pageSec}>
+            <div class="flex flex-col gap-8 max-w-sm w-full">
+                <div class="flex flex-col gap-3">
+                    <Tag>Your aesthetic</Tag>
+                    <h2 class="text-4xl font-black leading-snug" style={{ color: css.content }}>
+                        Time spent<br />per theme
+                    </h2>
+                    <p class="text-sm" style={{ color: css.muted }}>
+                        Total: {formatMs(total)} on SCELE
+                    </p>
+                </div>
+                {d.themeBreakdown.length === 0 ? (
+                    <p class="text-sm" style={{ color: css.muted }}>No theme usage recorded yet.</p>
+                ) : (
+                    <div class="flex flex-col gap-4">
+                        {d.themeBreakdown.map((e, i) => {
+                            const pct = Math.round((e.totalMs / total) * 100);
+                            const isTop = i === 0;
+                            return (
+                                <div key={e.name} class="flex flex-col gap-1.5">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2">
+                                            {isTop && <span class="text-xs font-black" style={{ color: css.primary }}>★</span>}
+                                            <span class="text-sm font-bold" style={{ color: css.content }}>{e.name}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-semibold" style={{ color: css.muted }}>{pct}%</span>
+                                            <span class="text-sm font-black" style={{ color: css.content }}>{formatMs(e.totalMs)}</span>
+                                        </div>
+                                    </div>
+                                    <div class="h-2 rounded-full overflow-hidden" style={{ backgroundColor: css.edge }}>
+                                        <div
+                                            class="h-full rounded-full"
+                                            style={{ width: `${pct}%`, backgroundColor: isTop ? css.primary : css.highlight }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </Slide>
+    );
+}
+
+function PersonalitySlide({ d }: { d: SlideData }) {
+    const emoji = d.personality === "Night Owl" ? "🦉"
+        : d.personality === "Deadline Fighter" ? "⚡"
+        : d.personality === "Consistent Grinder" ? "🔥"
+        : "🧭";
+
     return (
         <Slide>
             <div class="flex flex-col gap-8 max-w-sm w-full items-center text-center">
-                <div class="text-8xl">{isNight ? "🦉" : "☀️"}</div>
+                <div class="text-8xl">{emoji}</div>
                 <div class="flex flex-col gap-3 items-center">
                     <Tag>You are a</Tag>
-                    <h2 class="text-4xl font-black mt-1" style={{ color: css.primary }}>{MOCK.personality}</h2>
-                    <p class="text-sm leading-relaxed max-w-xs" style={{ color: css.muted }}>{MOCK.personalityDesc}</p>
+                    <h2 class="text-4xl font-black mt-1" style={{ color: css.primary }}>{d.personality}</h2>
+                    <p class="text-sm leading-relaxed max-w-xs" style={{ color: css.muted }}>{d.personalityDesc}</p>
                 </div>
                 <div class="grid grid-cols-3 gap-3 w-full">
                     {[
@@ -352,85 +532,246 @@ function PersonalitySlide() {
     );
 }
 
-function EndSlide() {
+function EndSlide({ d }: { d: SlideData }) {
     return (
         <Slide bg={css.primary}>
             <div class="flex flex-col items-center gap-8 text-center max-w-sm">
                 <Trophy class="w-20 h-20" style={{ color: css.onPrimary, opacity: 0.9 }} />
                 <div class="flex flex-col gap-4">
                     <h2 class="text-5xl font-black leading-tight" style={{ color: css.onPrimary }}>
-                        See you next<br />semester 👋
+                        Keep it up 👋
                     </h2>
                     <p class="text-base font-medium" style={{ color: css.onPrimaryA60 }}>
-                        {MOCK.totalDeadlines} deadlines down. {MOCK.midnightSessions} midnight sessions.<br />You made it.
+                        {d.totalActions.toLocaleString()} actions. {d.midnightPct}% midnight activity.<br />
+                        {d.activeDays} days logged. You made it.
                     </p>
                 </div>
                 <p class="text-xs" style={{ color: css.onPrimaryA30 }}>
-                    Sceless · {MOCK.semester}
+                    Sceless · {d.userName}
                 </p>
             </div>
         </Slide>
     );
 }
 
-// ── Registry ──────────────────────────────────────────────────────────────────
+// ── Compact export card ───────────────────────────────────────────────────────
+// Uses only inline styles with real hex values — html-to-image can't resolve CSS vars.
 
-const SLIDES = [
-    HeroSlide, OverviewSlide, BusiestSlide, CoursesSlide,
-    NightOwlSlide, MidnightSlide, StreakSlide, PersonalitySlide, EndSlide,
-];
+function CompactCard({ d, t }: { d: SlideData; t: ThemeConfig }) {
+    const peakLabel = d.peakHour === 0 ? "12 AM" : d.peakHour < 12 ? `${d.peakHour} AM` : d.peakHour === 12 ? "12 PM" : `${d.peakHour - 12} PM`;
+    const maxHourly = Math.max(...d.hourly, 1);
+    const maxWeekday = Math.max(...d.weekday, 1);
+    const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+    const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const personalityEmoji = d.personality === "Night Owl" ? "🦉" : d.personality === "Deadline Fighter" ? "⚡" : d.personality === "Consistent Grinder" ? "🔥" : "🧭";
+    const topCourseMax = Math.max(...d.topCourses.map(c => c.count), 1);
+    const barAccents = [t.primary, t.highlight, t.danger];
+
+    const hourlyTotal = d.hourly.reduce((a, b) => a + b, 0);
+    const morningPct = hourlyTotal > 0 ? Math.round(d.hourly.slice(6, 12).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
+    const totalModuleClicks = Object.values(d.moduleTypeClicks).reduce((a: number, b: number) => a + b, 0);
+    const busiestWeekday = weekdayNames[d.weekday.indexOf(Math.max(...d.weekday))];
+
+    // Smart conditional stats — never show a 0% that tells the user nothing
+    const timeOfDayStat = d.nightOwlPct > 5
+        ? { label: "Night owl", value: `${d.nightOwlPct}%` }
+        : morningPct > 25
+        ? { label: "Early bird", value: `${morningPct}%` }
+        : { label: "Busiest day", value: busiestWeekday };
+
+    const midnightStat = d.midnightPct > 0
+        ? { label: "Midnight activity", value: `${d.midnightPct}%` }
+        : { label: "Module clicks", value: totalModuleClicks };
+
+    const cell = (label: string, value: string | number, color?: string) => (
+        <div style={{ backgroundColor: t.bg, padding: "12px 14px", display: "flex", flexDirection: "column" as const, gap: "3px" }}>
+            <span style={{ color: color ?? t.primary, fontSize: "16px", fontWeight: 900, lineHeight: 1.1 }}>{value}</span>
+            <span style={{ color: t.textMuted, fontSize: "9px", fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "0.07em" }}>{label}</span>
+        </div>
+    );
+
+    return (
+        <div style={{
+            width: "540px", backgroundColor: t.bg, borderRadius: "16px", overflow: "hidden",
+            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        }}>
+            {/* Header */}
+            <div style={{ backgroundColor: t.primary, padding: "20px 24px 18px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                    <div>
+                        <p style={{ color: t.onPrimary, opacity: 0.55, fontSize: "9px", fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase" as const, margin: 0 }}>
+                            Sceless Wrapped
+                        </p>
+                        <p style={{ color: t.onPrimary, fontSize: "20px", fontWeight: 900, margin: "4px 0 0", lineHeight: 1.2 }}>
+                            {d.userName}'s semester
+                        </p>
+                        <p style={{ color: t.onPrimary, opacity: 0.6, fontSize: "11px", fontWeight: 600, margin: "4px 0 0" }}>
+                            {d.activeDays} active days · {d.personality}
+                        </p>
+                    </div>
+                    <span style={{ fontSize: "40px", lineHeight: 1 }}>{personalityEmoji}</span>
+                </div>
+
+                {/* Hourly bars */}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: "2px", height: "36px", marginTop: "14px" }}>
+                    {d.hourly.map((v, h) => {
+                        const isPeak = h === d.peakHour;
+                        const isNight = h >= 22 || h < 4;
+                        return (
+                            <div
+                                key={h}
+                                style={{
+                                    flex: 1,
+                                    height: `${Math.max(2, (v / maxHourly) * 100)}%`,
+                                    backgroundColor: isPeak ? t.onPrimary : isNight ? t.onPrimary : t.onPrimary,
+                                    opacity: isPeak ? 1 : isNight ? 0.5 : 0.25,
+                                    borderRadius: "2px 2px 0 0",
+                                }}
+                            />
+                        );
+                    })}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                    <span style={{ color: t.onPrimary, opacity: 0.4, fontSize: "8px", fontWeight: 600 }}>12 AM</span>
+                    <span style={{ color: t.onPrimary, opacity: 0.8, fontSize: "8px", fontWeight: 800 }}>▲ Peak {peakLabel}</span>
+                    <span style={{ color: t.onPrimary, opacity: 0.4, fontSize: "8px", fontWeight: 600 }}>11 PM</span>
+                </div>
+            </div>
+
+            {/* Stats grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1px", background: t.border }}>
+                {cell("Active days",      d.activeDays)}
+                {cell("Tab switches",     d.tabSwitches)}
+                {cell("Peak hour",        peakLabel)}
+                {cell("Best streak",      d.longestStreak.days > 0 ? `${d.longestStreak.days}d` : "—")}
+                {cell("Busiest month",    d.busiest.name || "—")}
+                {cell(midnightStat.label, midnightStat.value)}
+                {cell(timeOfDayStat.label, timeOfDayStat.value)}
+                {cell("Last-minute",      d.lastMinuteOpens, d.lastMinuteOpens > 5 ? t.danger : undefined)}
+                {cell("Best day",         d.busiestDayCount > 0 ? `${d.busiestDayCount} actions` : "—")}
+                {cell(d.isWeekendWarrior ? "Weekend warrior 🎮" : "Weekday grinder 💼", `${d.weekendPct}%`)}
+                {d.topModule ? cell("Top module", `${d.topModule.type} ×${d.topModule.count}`) : cell("Quiz reviews", d.quizReviews)}
+                {cell("Theme changes",    d.themeChanges)}
+            </div>
+
+            {/* Weekday bars */}
+            <div style={{ padding: "14px 18px 10px", borderTop: `1px solid ${t.border}` }}>
+                <p style={{ color: t.textMuted, fontSize: "8px", fontWeight: 900, textTransform: "uppercase" as const, letterSpacing: "0.1em", margin: "0 0 8px" }}>
+                    Activity by weekday
+                </p>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", height: "28px" }}>
+                    {d.weekday.map((v, i) => (
+                        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column" as const, alignItems: "center", gap: "3px", height: "100%" }}>
+                            <div style={{
+                                width: "100%",
+                                height: `${Math.max(3, (v / maxWeekday) * 100)}%`,
+                                backgroundColor: t.primary,
+                                opacity: v > 0 ? 0.8 : 0.15,
+                                borderRadius: "2px",
+                                marginTop: "auto",
+                            }} />
+                        </div>
+                    ))}
+                </div>
+                <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                    {weekdays.map((d, i) => (
+                        <span key={i} style={{ flex: 1, textAlign: "center", color: t.textMuted, fontSize: "8px", fontWeight: 700 }}>{d}</span>
+                    ))}
+                </div>
+            </div>
+
+            {/* Top courses */}
+            {d.topCourses.length > 0 && (
+                <div style={{ padding: "10px 18px 14px", borderTop: `1px solid ${t.border}` }}>
+                    <p style={{ color: t.textMuted, fontSize: "8px", fontWeight: 900, textTransform: "uppercase" as const, letterSpacing: "0.1em", margin: "0 0 8px" }}>
+                        Top courses
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column" as const, gap: "6px" }}>
+                        {d.topCourses.map((c, i) => (
+                            <div key={c.name} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ color: barAccents[i] ?? t.primary, fontSize: "9px", fontWeight: 900, width: "14px" }}>#{i + 1}</span>
+                                <span style={{ color: t.text, fontSize: "11px", fontWeight: 700, flex: 1 }}>{c.name}</span>
+                                <div style={{ width: "80px", height: "4px", borderRadius: "2px", background: t.border, overflow: "hidden" }}>
+                                    <div style={{ width: `${(c.count / topCourseMax) * 100}%`, height: "100%", backgroundColor: barAccents[i] ?? t.primary, borderRadius: "2px" }} />
+                                </div>
+                                <span style={{ color: t.text, fontSize: "11px", fontWeight: 900, width: "22px", textAlign: "right" as const }}>{c.count}×</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Extras */}
+            <div style={{ display: "flex", gap: "1px", background: t.border }}>
+                {d.topTheme && cell("Fav theme", d.topTheme)}
+                {cell("Quiz reviews", d.quizReviews)}
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: "8px 18px", borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: t.textMuted, fontSize: "8px", fontWeight: 700 }}>sceless.cornellius.dev</span>
+                <span style={{ color: t.textMuted, fontSize: "8px", fontWeight: 700 }}>{d.userName}</span>
+            </div>
+        </div>
+    );
+}
+
+// ── Root ──────────────────────────────────────────────────────────────────────
 
 const SLIDE_LABELS = [
     "Cover", "Overview", "Busiest Month", "Top Courses",
-    "Your Rhythm", "Midnight Grind", "Best Streak", "Personality", "Finale",
+    "Your Rhythm", "Midnight Grind", "Best Streak", "Themes", "Personality", "Finale",
 ];
-
-// ── Compact export card (hidden, captured by html-to-image) ──────────────────
-
-// ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function WrappedPage() {
     const [current,   setCurrent]   = useState(0);
     const [exporting, setExporting] = useState(false);
+    const [data,      setData]      = useState<SlideData | null>(null);
     const compactRef = useRef<HTMLDivElement>(null);
-    const scrollRef  = useRef<HTMLDivElement>(null);
+    const wheelLock  = useRef(false);
 
-    const handleScroll = (e: Event) => {
-        const el = e.target as HTMLElement;
-        setCurrent(Math.round(el.scrollTop / el.clientHeight));
-    };
+    useEffect(() => { buildSlideData().then(setData); }, []);
 
-    const scrollTo = (i: number) => {
-        scrollRef.current?.scrollTo({ top: i * (scrollRef.current.clientHeight), behavior: "smooth" });
-    };
+    const goTo = useCallback((i: number) => {
+        setCurrent(Math.max(0, Math.min(SLIDE_LABELS.length - 1, i)));
+    }, []);
+
+    const handleWheel = useCallback((e: WheelEvent) => {
+        e.preventDefault();
+        if (wheelLock.current) return;
+        wheelLock.current = true;
+        setCurrent(c => Math.max(0, Math.min(SLIDE_LABELS.length - 1, c + (e.deltaY > 0 ? 1 : -1))));
+        setTimeout(() => { wheelLock.current = false; }, 500);
+    }, []);
+
+    const t = theme.value;
 
     const captureCard = useCallback(async (): Promise<string> => {
-        const el = compactRef.current!;
+        const el = compactRef.current;
+        if (!el) throw new Error("no card");
+        // Temporarily move into viewport — html-to-image can't capture off-screen elements
         el.style.left = "0";
-        el.style.zIndex = "-1";
+        el.style.top = "0";
+        await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
         const { toPng } = await import("html-to-image");
-        const url = await toPng(el, { width: el.offsetWidth, height: el.offsetHeight, pixelRatio: 2 });
+        const url = await toPng(el, { pixelRatio: 2, skipFonts: false });
         el.style.left = "-9999px";
-        el.style.zIndex = "";
+        el.style.top = "-9999px";
         return url;
     }, []);
 
     const handleSaveImage = useCallback(async () => {
-        if (!compactRef.current) return;
+        if (!data) return;
         setExporting(true);
         try {
             const url = await captureCard();
             const a = document.createElement("a");
-            a.href = url;
-            a.download = "sceless-wrapped.png";
-            a.click();
-        } finally {
-            setExporting(false);
-        }
-    }, [captureCard]);
+            a.href = url; a.download = "sceless-wrapped.png"; a.click();
+        } finally { setExporting(false); }
+    }, [data, captureCard]);
 
     const handleShare = useCallback(async () => {
-        if (!compactRef.current) return;
+        if (!data) return;
         setExporting(true);
         try {
             const dataUrl = await captureCard();
@@ -438,123 +779,55 @@ export default function WrappedPage() {
             const file = new File([blob], "sceless-wrapped.png", { type: "image/png" });
             await navigator.share({ files: [file] });
         } catch {
-            // share not supported — fall back to download
-            const dataUrl = await captureCard();
-            const a = document.createElement("a");
-            a.href = dataUrl;
-            a.download = "sceless-wrapped.png";
-            a.click();
-        } finally {
-            setExporting(false);
-        }
-    }, [captureCard]);
+            try {
+                const dataUrl = await captureCard();
+                const a = document.createElement("a"); a.href = dataUrl; a.download = "sceless-wrapped.png"; a.click();
+            } catch { /* ignore */ }
+        } finally { setExporting(false); }
+    }, [data, captureCard]);
 
-    // Use actual hex colors from theme signal — html-to-image can't resolve color-mix() or CSS vars
-    const t = theme.value;
+    if (!data) {
+        return (
+            <div class="h-full flex items-center justify-center" style={{ backgroundColor: css.page }}>
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: css.primary }} />
+            </div>
+        );
+    }
+
+    const slides = [HeroSlide, OverviewSlide, BusiestSlide, CoursesSlide, NightOwlSlide, MidnightSlide, StreakSlide, ThemeSlide, PersonalitySlide, EndSlide];
 
     return (
-        <div class="relative h-screen w-screen overflow-hidden" style={{ backgroundColor: css.page }}>
-            {/* Compact export card — off-screen, captured by html-to-image with real hex colors */}
-            <div
-                ref={compactRef}
-                style={{
-                    position: "fixed", left: "-9999px", top: "0",
-                    width: "540px",
-                    backgroundColor: t.bg,
-                    borderRadius: "20px",
-                    overflow: "hidden",
-                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                }}
-            >
-                {/* Header */}
-                <div style={{ backgroundColor: t.primary, padding: "24px 28px 20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <div>
-                            <p style={{ color: t.onPrimary, opacity: 0.6, fontSize: "10px", fontWeight: 900, letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>
-                                Sceless Wrapped · {MOCK.semester}
-                            </p>
-                            <p style={{ color: t.onPrimary, fontSize: "22px", fontWeight: 900, margin: "4px 0 0" }}>
-                                {MOCK.userName}'s semester
-                            </p>
-                        </div>
-                        <div style={{ fontSize: "36px" }}>🦉</div>
-                    </div>
-                    <div style={{ marginTop: "16px" }}>
-                        <div style={{ background: t.onPrimary, opacity: 0.25, borderRadius: "4px", height: "6px", overflow: "hidden" }}>
-                            <div style={{ width: `${onTimePct}%`, height: "100%", backgroundColor: t.onPrimary, borderRadius: "4px", opacity: 1 }} />
-                        </div>
-                        <p style={{ color: t.onPrimary, opacity: 0.6, fontSize: "10px", fontWeight: 700, margin: "6px 0 0" }}>
-                            {onTimePct}% on-time · {MOCK.totalDeadlines} total deadlines
-                        </p>
-                    </div>
-                </div>
-
-                {/* Stat grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "1px", background: t.border }}>
-                    {[
-                        { label: "Courses",        value: MOCK.totalCourses,                       color: t.primary  },
-                        { label: "On Time",         value: `${MOCK.onTime}/${MOCK.totalDeadlines}`, color: t.primary  },
-                        { label: "Overdue",         value: MOCK.overdue,                            color: t.danger   },
-                        { label: "Busiest Month",   value: MOCK.busiestMonth.name,                  color: t.primary  },
-                        { label: "Midnight Nights", value: MOCK.midnightSessions,                   color: t.highlight},
-                        { label: "Best Streak",     value: MOCK.longestStreak.value,                color: t.primary  },
-                        { label: "Peak Hour",       value: `${MOCK.peakHour > 12 ? MOCK.peakHour - 12 : MOCK.peakHour}${MOCK.peakHour >= 12 ? "PM" : "AM"}`, color: t.primary },
-                        { label: "Personality",     value: MOCK.personality,                        color: t.primary  },
-                    ].map(({ label, value, color }) => (
-                        <div key={label} style={{ backgroundColor: t.bg, padding: "14px 12px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                            <p style={{ color, fontSize: "15px", fontWeight: 900, margin: 0, lineHeight: 1.1 }}>{value}</p>
-                            <p style={{ color: t.textMuted, fontSize: "9px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", margin: 0 }}>{label}</p>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Top courses */}
-                <div style={{ padding: "16px 20px", borderTop: `1px solid ${t.border}` }}>
-                    <p style={{ color: t.textMuted, fontSize: "9px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px" }}>
-                        Most demanding courses
-                    </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        {MOCK.topCourses.map((c, i) => (
-                            <div key={c.name} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <span style={{ color: t.textMuted, fontSize: "10px", fontWeight: 900, width: "14px" }}>#{i + 1}</span>
-                                <span style={{ color: t.text, fontSize: "11px", fontWeight: 700, flex: 1 }}>{c.name}</span>
-                                <div style={{ width: "80px", height: "4px", borderRadius: "2px", background: t.border, overflow: "hidden" }}>
-                                    <div style={{ width: `${Math.round((c.count / MOCK.topCourses[0].count) * 100)}%`, height: "100%", backgroundColor: t.primary, borderRadius: "2px" }} />
-                                </div>
-                                <span style={{ color: t.text, fontSize: "11px", fontWeight: 900, width: "20px", textAlign: "right" }}>{c.count}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div style={{ padding: "10px 20px", borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between" }}>
-                    <p style={{ color: t.textMuted, fontSize: "9px", fontWeight: 700, margin: 0 }}>sceless.cornellius.dev</p>
-                    <p style={{ color: t.textMuted, fontSize: "9px", fontWeight: 700, margin: 0 }}>{MOCK.semester}</p>
-                </div>
+        <div class="relative h-full w-full overflow-hidden" style={{ backgroundColor: css.page }}>
+            {/* Off-screen compact card — captured by html-to-image */}
+            <div style={{ position: "fixed", left: "-9999px", top: "-9999px", zIndex: 9999 }} ref={compactRef}>
+                <CompactCard d={data} t={t as any} />
             </div>
 
-            {/* Scroll container */}
+            {/* Slide container — transform-based, one slide at a time */}
             <div
-                ref={scrollRef}
-                id="wrapped-scroll"
-                class="h-full w-full overflow-y-scroll snap-y snap-mandatory"
-                style={{ scrollbarWidth: "none" }}
-                onScroll={handleScroll}
+                class="absolute inset-0"
+                onWheel={handleWheel as any}
             >
-                {SLIDES.map((S, i) => (
-                    <div key={i}>
-                        <S />
+                {slides.map((S, i) => (
+                    <div
+                        key={i}
+                        class="absolute inset-0"
+                        style={{
+                            transform: `translateY(${(i - current) * 100}%)`,
+                            transition: "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                        }}
+                    >
+                        <S d={data} />
                     </div>
                 ))}
             </div>
 
             {/* Dot nav */}
-            <div class="no-print absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
-                {SLIDES.map((_, i) => (
+            <div class="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10">
+                {slides.map((_, i) => (
                     <button
                         key={i}
-                        onClick={() => scrollTo(i)}
+                        onClick={() => goTo(i)}
                         class="w-1.5 rounded-full transition-all cursor-pointer"
                         style={{
                             height:          i === current ? "24px" : "6px",
@@ -567,11 +840,11 @@ export default function WrappedPage() {
 
             {/* Toolbar */}
             <div
-                class="no-print absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-2xl z-10"
+                class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-2xl z-10"
                 style={{ backgroundColor: css.page, border: `2px solid ${css.edge}`, boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}
             >
                 <span class="text-xs font-bold" style={{ color: css.muted }}>
-                    {current + 1} / {SLIDES.length}
+                    {current + 1} / {slides.length}
                 </span>
                 <div class="w-px h-4 mx-1" style={{ backgroundColor: css.edge }} />
                 <button

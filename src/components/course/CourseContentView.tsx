@@ -453,7 +453,8 @@ function ModuleItem({
 						? "opacity-55 cursor-not-allowed"
 						: "hover:bg-primary/5 cursor-pointer"
 				}`}
-				onClick={isRestricted ? (e) => e.preventDefault() : () => trackModuleClick(module.modname, dueDate)}
+				onClick={isRestricted ? (e) => e.preventDefault() : undefined}
+				onMouseDown={isRestricted ? undefined : (e) => { if (e.button === 0 || e.button === 1) trackModuleClick(module.modname, dueDate); }}
 			>
 				{/* Colored type icon */}
 				<div class="relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: hexToRgba(getModuleColor(config.colorKey), 0.15) }}>
