@@ -50,10 +50,12 @@ jobs:
       - name: Find zip files
         id: zips
         run: |
-          CHROME_ZIP=$(find .output -name "*.zip" ! -name "*firefox*" | head -1)
+          CHROME_ZIP=$(find .output -name "*.zip" ! -name "*firefox*" ! -name "*sources*" | head -1)
           FIREFOX_ZIP=$(find .output -name "*firefox*.zip" | head -1)
+          SOURCES_ZIP=$(find .output -name "*sources*.zip" | head -1)
           echo "chrome=$CHROME_ZIP" >> $GITHUB_OUTPUT
           echo "firefox=$FIREFOX_ZIP" >> $GITHUB_OUTPUT
+          echo "sources=$SOURCES_ZIP" >> $GITHUB_OUTPUT
 
       - name: Upload to release
         env:
@@ -64,12 +66,14 @@ jobs:
             gh release create "${{ github.ref_name }}" \
               --generate-notes \
               "${{ steps.zips.outputs.chrome }}" \
-              "${{ steps.zips.outputs.firefox }}"
+              "${{ steps.zips.outputs.firefox }}" \
+              "${{ steps.zips.outputs.sources }}"
           else
             # Manual trigger — upload (overwrite) assets on the latest release
             LATEST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
             gh release upload "$LATEST_TAG" \
               "${{ steps.zips.outputs.chrome }}" \
               "${{ steps.zips.outputs.firefox }}" \
+              "${{ steps.zips.outputs.sources }}" \
               --clobber
           fi
