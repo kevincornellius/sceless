@@ -1,8 +1,6 @@
 import type { ComponentChildren } from "preact";
 import Sidebar from "./ui/Sidebar";
 import Navbar from "./ui/Navbar";
-import { ScheduleBar } from "./ui/ScheduleBar";
-
 interface LayoutProps {
 	children: ComponentChildren;
 }
@@ -21,7 +19,6 @@ export function Layout({ children }: LayoutProps) {
 					</div>
 				</div>
 			</div>
-			<ScheduleBar />
 		</div>
 	);
 }

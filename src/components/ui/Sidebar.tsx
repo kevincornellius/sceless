@@ -10,6 +10,7 @@ import {
 import { pinnedCourses, pinnedCoursesLoaded } from "@/src/stores/pinned";
 import { useEffect, useState } from "preact/hooks";
 import { Logo, LogoL } from "./Logo";
+import { ScheduleSection } from "./ScheduleSection";
 import {
 	BookOpen,
 	CalendarDays,
@@ -358,6 +359,7 @@ const Sidebar = () => {
 			<PinnedTabs />
 			<OpenTabs />
 			</div>
+			<ScheduleSection expanded={expanded} />
 			<div
 				onMouseDown={handleMouseDown}
 				class={`absolute top-0 right-0 h-full w-1 transition-colors ${
