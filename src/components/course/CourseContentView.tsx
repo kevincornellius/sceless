@@ -20,6 +20,7 @@ import {
 } from "lucide-preact";
 import { SCELE_URL } from "../../config";
 import { sanitizeHtml } from "../../utils/sanitize";
+import { trackModuleClick } from "../../stores/indexeddb/activity";
 import { CourseSection, CourseModule, getModuleDueDate, formatDueDate } from "../../types/course";
 import { theme } from "../../stores/theme";
 import type { ModuleTypeColors } from "../../types/themes";
@@ -453,6 +454,7 @@ function ModuleItem({
 						: "hover:bg-primary/5 cursor-pointer"
 				}`}
 				onClick={isRestricted ? (e) => e.preventDefault() : undefined}
+				onMouseDown={isRestricted ? undefined : (e) => { if (e.button === 0 || e.button === 1) trackModuleClick(module.modname, dueDate); }}
 			>
 				{/* Colored type icon */}
 				<div class="relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: hexToRgba(getModuleColor(config.colorKey), 0.15) }}>

@@ -14,13 +14,15 @@ export const closeAllDropdowns = () => {
 };
 import type { Profile as ProfileType } from "@/src/types/profile";
 import type { AppNotification } from "@/src/types/scele";
-import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon, Settings, Flag } from "lucide-preact";
+import { LogOut, Clock, Bell, Search, ChevronDown, X, Palette, BookOpen, Trash2Icon, Settings, Flag, Sparkles } from "lucide-preact";
 import { logout } from "@/src/stores/auth";
 import { theme, changeTheme } from "@/src/stores/theme";
 import { defaultThemes, type ThemeConfig } from "@/src/types/themes";
 import { CourseDetailTab } from "@/src/pages/CourseDetailPage";
 import { SettingsTab } from "@/src/pages/SettingsPage";
+import { WrappedTab } from "@/src/pages/WrappedPage";
 import { navigateTab } from "@/src/routing/router";
+import { WRAPPED_ENABLED } from "@/src/config";
 import { db } from "@/src/stores/indexeddb/db";
 
 interface UserProfileProps {
@@ -45,11 +47,11 @@ function Notifications() {
     const unreadCount = notifications.filter(n => !n.isRead).length;
 
     return (
-        <div 
-            class="relative" 
+        <div
+            class="relative"
             ref={dropdownRef}
         >
-            <button 
+            <button
                 onClick={(e) => {
                     e.stopPropagation();
                     setIsOpen(!isOpen);
@@ -70,7 +72,7 @@ function Notifications() {
                         <span class="font-semibold text-content">Notifications</span>
                         <span class="text-xs text-content-muted">{unreadCount} unread</span>
                     </div>
-                    
+
                     <div class="flex-1 overflow-y-auto scrollbar-thin">
                         {notifications.length === 0 ? (
                             <div class="p-4 text-center text-content-muted text-sm">
@@ -78,7 +80,7 @@ function Notifications() {
                             </div>
                         ) : (
                             notifications.map((notif) => (
-                                <div 
+                                <div
                                     key={notif.id}
                                     class={`p-3 border-b border-edge hover:bg-page-secondary cursor-pointer ${!notif.isRead ? 'bg-accent/5' : ''} `}
                                     onClick={() => {
@@ -125,11 +127,11 @@ function ThemeSelector() {
     };
 
     return (
-        <div 
-            class="relative" 
+        <div
+            class="relative"
             ref={dropdownRef}
         >
-            <button 
+            <button
                 onClick={(e) => {
                     e.stopPropagation();
                     setIsOpen(!isOpen);
@@ -145,17 +147,16 @@ function ThemeSelector() {
                     <div class="p-3 border-b border-edge">
                         <span class="font-semibold text-content text-sm">Choose Theme</span>
                     </div>
-                    
+
                     <div class="py-1">
                         {defaultThemes.map((t) => (
                             <button
                                 key={t.name}
                                 onClick={() => handleThemeChange(t)}
-                                class={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-page-secondary transition-colors ${
-                                    t.name === currentTheme.name ? 'bg-page-secondary' : ''
-                                }`}
+                                class={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-page-secondary transition-colors ${t.name === currentTheme.name ? 'bg-page-secondary' : ''
+                                    }`}
                             >
-                                <div 
+                                <div
                                     class="w-5 h-5 rounded-full border-2 border-edge"
                                     style={{ backgroundColor: t.primary }}
                                 />
@@ -176,12 +177,56 @@ interface UserProfileProps {
     profile: ProfileType | null;
 }
 
+function ClearDataModal({ onConfirm, onCancel }: {
+    onConfirm: (keepStats: boolean) => void;
+    onCancel: () => void;
+}) {
+    const [keepStats, setKeepStats] = useState(true);
+    return (
+        <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={onCancel}>
+            <div class="bg-page border-2 border-edge rounded-2xl p-6 w-80 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <h3 class="font-bold text-base text-content mb-1">Clear All Data?</h3>
+                <p class="text-sm text-content-muted mb-4">
+                    Removes your token, settings, and cached data. You'll be logged out.
+                </p>
+                <label class="flex items-center gap-3 p-3 rounded-xl border-2 border-edge bg-page-secondary cursor-pointer mb-5 hover:border-primary transition-colors">
+                    <input
+                        type="checkbox"
+                        checked={keepStats}
+                        onChange={() => setKeepStats(v => !v)}
+                        class="w-4 h-4 accent-primary shrink-0"
+                    />
+                    <div>
+                        <p class="text-sm font-semibold text-content">Keep Wrapped stats</p>
+                        <p class="text-xs text-content-muted">Preserve activity history for Sceless Wrapped</p>
+                    </div>
+                </label>
+                <div class="flex gap-2">
+                    <button
+                        onClick={onCancel}
+                        class="flex-1 py-2 rounded-lg border-2 border-edge text-sm font-semibold text-content hover:bg-page-secondary transition-colors cursor-pointer"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => onConfirm(keepStats)}
+                        class="flex-1 py-2 rounded-lg bg-danger text-on-primary text-sm font-semibold hover:bg-danger/80 transition-colors cursor-pointer"
+                    >
+                        Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function UserProfile({ profile }: UserProfileProps) {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const isOpen = navbarDropdown.value === "profile";
     const setIsOpen = (open: boolean) => {
         navbarDropdown.value = open ? "profile" : null;
     };
+    const [showClearModal, setShowClearModal] = useState(false);
 
     const initials = profile?.name
         ?.split(" ")
@@ -197,15 +242,26 @@ function UserProfile({ profile }: UserProfileProps) {
         await db.clearFullDatabase();
         window.location.reload();
     };
-    const handleClearData = async () => {
+    const handleClearData = () => {
+        setIsOpen(false);
+        setShowClearModal(true);
+    };
+    const handleClearDataConfirm = async (keepStats: boolean) => {
+        let saved: { activity_stats?: unknown } = {};
+        if (keepStats) {
+            saved = await browser.storage.local.get("activity_stats");
+        }
         await db.clearFullDatabase();
         await browser.storage.local.clear();
+        if (keepStats && saved.activity_stats !== undefined) {
+            await browser.storage.local.set({ activity_stats: saved.activity_stats });
+        }
         window.location.reload();
     };
 
     return (
-        <div 
-            class="relative" 
+        <div
+            class="relative"
             ref={dropdownRef}
         >
             <button
@@ -234,6 +290,13 @@ function UserProfile({ profile }: UserProfileProps) {
                     class={`text-content-muted transition-transform ${isOpen ? "rotate-180" : ""}`}
                 />
             </button>
+
+            {showClearModal && (
+                <ClearDataModal
+                    onConfirm={(keepStats) => { setShowClearModal(false); void handleClearDataConfirm(keepStats); }}
+                    onCancel={() => setShowClearModal(false)}
+                />
+            )}
 
             {isOpen && (
                 <div class="absolute right-0 mt-2 top-full w-56 bg-page border border-edge rounded-lg shadow-lg overflow-hidden z-50">
@@ -290,22 +353,22 @@ const Navbar = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const searchRef = useRef<HTMLDivElement>(null);
 
-	const [currentTime, setCurrentTime] = useState(new Date())
-	
-	useEffect(() => {
-		const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-		return () => clearInterval(timer)
-	}, [])
-	
-	const timeStr = currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second:'2-digit' })
-	const dateStr = currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    const [currentTime, setCurrentTime] = useState(new Date())
+
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+        return () => clearInterval(timer)
+    }, [])
+
+    const timeStr = currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const dateStr = currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
     // Filter courses based on search
     const filteredCourses = searchQuery.trim()
-        ? courses.value.filter(c => 
+        ? courses.value.filter(c =>
             c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             c.code.toLowerCase().includes(searchQuery.toLowerCase())
-          ).slice(0, 5)
+        ).slice(0, 5)
         : [];
 
     const handleCourseClick = async (courseId: number, courseTitle: string) => {
@@ -315,7 +378,7 @@ const Navbar = () => {
         isSearchOpen.value = false;
         closeAllDropdowns();
     };
-	
+
     useEffect(() => {
         loadSiteInfo().then(({ info }) => {
             if (info) setProfile(info);
@@ -326,7 +389,7 @@ const Navbar = () => {
     return (
         <header class="h-14 shrink-0 flex items-center justify-between w-full pr-8">
 
-			<div className="relative hidden sm:block" ref={searchRef}>
+            <div className="relative hidden sm:block" ref={searchRef}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
                 <input
                     type="text"
@@ -339,7 +402,7 @@ const Navbar = () => {
                     onFocus={() => { isSearchOpen.value = true; }}
                     className="w-64 lg:w-72 pl-9 pr-3 py-2 rounded-lg text-sm border-2 transition-all focus:outline-none bg-page text-content border-edge focus:border-primary focus:ring-1 focus:ring-primary"
                 />
-                
+
                 {/* Search Results Dropdown */}
                 {isSearchOpen.value && filteredCourses.length > 0 && (
                     <div class="absolute top-full mt-2 w-full bg-page border border-edge rounded-lg shadow-lg overflow-hidden z-50">
@@ -358,32 +421,46 @@ const Navbar = () => {
                         ))}
                     </div>
                 )}
-        	</div>
-			<div class="flex items-center gap-2">
-				 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-page border-edge border-2">
-					<Clock className="w-4 h-4 text-primary"/>
-					<span className="text-sm font-semibold text-content">{timeStr}</span>
-					<span className="text-xs font-medium text-content-muted max-lg:hidden">{dateStr}</span>
-				</div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-page border-edge border-2">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold text-content">{timeStr}</span>
+                    <span className="text-xs font-medium text-content-muted max-lg:hidden">{dateStr}</span>
+                </div>
 
-				  <Notifications />
+                <Notifications />
 
-                  <ThemeSelector />
+                <ThemeSelector />
 
-                  <a
-                      href="https://sceless.cornellius.dev/feedback"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Report a bug or send feedback"
-                      class="p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-edge hover:text-content transition-all"
-                  >
-                      <Flag className="w-4 h-4" />
-                  </a>
+
+                <a
+                    href="https://sceless.cornellius.dev/feedback"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Report a bug or send feedback"
+                    class="p-2 rounded-lg bg-page text-content-muted border-2 border-edge hover:bg-edge hover:text-content transition-all"
+                >
+                    <Flag className="w-4 h-4" />
+                </a>
+                {WRAPPED_ENABLED === "true" && (
+                    <button
+                        onClick={() => navigateTab(WrappedTab)}
+                        title="Sceless Wrapped"
+                        class="relative p-2 rounded-lg cursor-pointer transition-all hover:scale-105 overflow-hidden"
+                        style={{
+                            background: "linear-gradient(135deg, var(--theme-primary), color-mix(in srgb, var(--theme-primary) 60%, white))",
+                            boxShadow: "0 0 10px 2px color-mix(in srgb, var(--theme-primary) 40%, transparent)",
+                        }}
+                    >
+                        <Sparkles class="w-4 h-4 relative z-10" style={{ color: "var(--theme-on-primary)" }} />
+                    </button>
+                )}
 
                 <UserProfile profile={profile} />
-			</div>
+            </div>
 
-               
+
         </header>
     );
 };

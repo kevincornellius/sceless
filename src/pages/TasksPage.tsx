@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "preact/hooks";
 import { Deadline } from "../types/scele";
+import { trackModuleClick } from "../stores/indexeddb/activity";
 import { Clock, AlertCircle, FileText, ChevronLeft, ChevronRight, X } from "lucide-preact";
 
 const DAYS   = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -215,7 +216,7 @@ export default function TasksPage() {
                                                 <div
                                                     key={ti}
                                                     title={task.title}
-                                                    onClick={(e) => { e.stopPropagation(); window.open(task.url, "_blank"); }}
+                                                    onClick={(e) => { e.stopPropagation(); trackModuleClick(task.module, new Date(task.dueTimestamp * 1000)); window.open(task.url, "_blank"); }}
                                                     class={[
                                                         "text-[10px] font-semibold px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-75 transition-opacity leading-tight",
                                                         isOv || urgent ? "bg-danger/15 text-danger" : "bg-primary/15 text-primary",
@@ -275,7 +276,7 @@ export default function TasksPage() {
                                 <div
                                     key={task.id}
                                     class="flex items-start gap-3 p-3 rounded-xl border-2 border-edge bg-page hover:border-primary cursor-pointer transition-colors"
-                                    onClick={() => window.open(task.url, "_blank")}
+                                    onClick={() => { trackModuleClick(task.module, new Date(task.dueTimestamp * 1000)); window.open(task.url, "_blank"); }}
                                 >
                                     <div class={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
                                         isOv || urgent ? "bg-danger/15" : "bg-primary/15"

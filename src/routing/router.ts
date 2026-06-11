@@ -9,6 +9,7 @@ import {
 	setActive,
 } from "../stores/tabs";
 import { Tab } from "../types/state";
+import { trackNavigationEvent } from "../stores/indexeddb/activity";
 
 // Guard: skip navigation if already on this exact tab
 let isNavigating = false;
@@ -32,6 +33,7 @@ export const navigateTab = async (tab: Tab) => {
 
 		await add(tab);
 		await setActive(tabKey);
+		if (bootComplete) trackNavigationEvent();
 	} finally {
 		isNavigating = false;
 	}

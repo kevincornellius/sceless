@@ -6,12 +6,14 @@ import SettingsPage from "./pages/SettingsPage";
 import { activeTabKey, initStore } from "./stores/tabs";
 import CourseDetailPage from "./pages/CourseDetailPage";
 import AllCoursesPage from "./pages/AllCoursesPage";
-import { initializeTheme } from "./stores/theme";
+import WrappedPage from "./pages/WrappedPage";
+import { theme, initializeTheme } from "./stores/theme";
 import { initNavigation, navigateTab, markBootComplete } from "./routing/router";
 import { initAuthStore, wsToken } from "./stores/auth";
 import { LoginPage } from "./pages/LoginPage";
 import type { ComponentChildren } from "preact";
 import { UrlToTab } from "./helper/tabs";
+import { WRAPPED_ENABLED } from "./config";
 import { loadCourses } from "./stores/indexeddb/course";
 import { loadSiteInfo } from "./stores/indexeddb/siteinfo";
 import { initPinnedCoursesStore } from "./stores/pinned";
@@ -37,6 +39,8 @@ const getPageFromActiveTabKey = (): ComponentChildren => {
 			return <SettingsPage />;
 		case "all-courses":
 			return <AllCoursesPage />;
+		case "wrapped":
+			return WRAPPED_ENABLED !== "false" ? <WrappedPage /> : <DashboardPage />;
 		default:
 			return <DashboardPage />;
 	}
@@ -91,6 +95,7 @@ const App = () => {
 
                     await navigateTab(UrlToTab(window.location.href) || DashboardTab);
                     markBootComplete();
+                    import("./stores/indexeddb/activity").then(({ trackThemeInit }) => trackThemeInit(theme.value.name));
                 } catch (e) {
                     console.error("Failed to boot core data", e);
                     setBootError(e instanceof Error ? e.message : "An unexpected error occurred.");
@@ -104,7 +109,10 @@ const App = () => {
     }, [appState]);
 
     useEffect(() => {
-        const handleUnload = () => setLastVisit();
+        const handleUnload = () => {
+            setLastVisit();
+            import("./stores/indexeddb/activity").then(({ trackThemeFlush }) => trackThemeFlush(theme.value.name));
+        };
         window.addEventListener("beforeunload", handleUnload);
         return () => window.removeEventListener("beforeunload", handleUnload);
     }, []);

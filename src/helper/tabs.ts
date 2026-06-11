@@ -3,6 +3,7 @@ import { CourseDetailTab } from "../pages/CourseDetailPage";
 import { DashboardTab } from "../pages/DashboardPage";
 import { SettingsTab } from "../pages/SettingsPage";
 import { AllCoursesTab } from "../pages/AllCoursesPage";
+import { WrappedTab } from "../pages/WrappedPage";
 import { Tab } from "../types/state";
 import { getCourseCode } from "../stores/indexeddb/course";
 
@@ -37,6 +38,8 @@ export function TabToUrl(tab: Tab): string {
 				return "user/preferences.php";
 			case "all-courses":
 				return "course/index.php";
+			case "wrapped":
+				return "sceless/wrapped";
 		}
 	};
 
@@ -73,6 +76,10 @@ export function UrlToTab(urlString: string): Tab | null {
 
 		if (path === "/course/index.php") {
 			return AllCoursesTab;
+		}
+
+		if (path === "/sceless/wrapped") {
+			return WrappedTab;
 		}
 
 		if (path === "/mod/forum/view.php") {

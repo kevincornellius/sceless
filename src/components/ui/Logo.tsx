@@ -54,7 +54,7 @@ export const LogoL = (props: JSX.IntrinsicElements["svg"]) => {
 	return (
 		<svg
 			{...props}
-			viewBox="0 0 90 15"
+			viewBox="41 1.5 8.5 12"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
 		>

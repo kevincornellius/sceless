@@ -1,0 +1,18 @@
+@import "@/src/assets/tailwind.css";
+
+/* Print: one slide per page, hide UI chrome */
+@media print {
+  .no-print { display: none !important; }
+  body { margin: 0; }
+  #wrapped-scroll {
+    overflow: visible !important;
+    height: auto !important;
+    display: block !important;
+  }
+  .snap-start {
+    page-break-after: always;
+    break-after: page;
+    min-height: 100vh;
+    height: 100vh;
+  }
+}

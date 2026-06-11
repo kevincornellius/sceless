@@ -8,6 +8,7 @@ import { ViewModeSelector, ChronologicalView, GroupedView, NewestView } from "..
 import { Search, ChevronDown, ChevronRight, Sparkles } from "lucide-preact";
 import { getCourseTitle } from "../stores/indexeddb/course";
 import { markCourseSeen, clearNewModuleCount, getNewModuleIds } from "../stores/seenModules";
+import { trackCourseVisit } from "../stores/indexeddb/activity";
 
 const CourseDetailPage = ({ courseId }: { courseId: string }) => {
     const [contents, setContents] = useState<CourseSection[]>([]);
@@ -36,6 +37,7 @@ const CourseDetailPage = ({ courseId }: { courseId: string }) => {
     }, [contents, searchQuery]);
 
     useEffect(() => {
+        trackCourseVisit(Number(courseId));
         const fetchContents = async () => {
             setLoading(true);
             try {

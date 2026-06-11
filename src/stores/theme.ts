@@ -48,5 +48,8 @@ export const initializeTheme = async () => {
 };
 
 export const changeTheme = async (newTheme: ThemeConfig) => {
+	const prevName = theme.value.name;
 	await themeStorage.setValue(newTheme);
+	const { trackThemeSwitch } = await import("./indexeddb/activity");
+	trackThemeSwitch(prevName, newTheme.name);
 };

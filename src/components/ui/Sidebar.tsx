@@ -21,6 +21,7 @@ import {
 	Menu,
 	MessageSquare,
 	Settings,
+	Sparkles,
 	X,
 } from "lucide-preact";
 
@@ -33,6 +34,7 @@ function getTabIcon(type: string) {
 		case "all-courses": return Library;
 		case "quiz-review": return ClipboardList;
 		case "forum":       return MessageSquare;
+		case "wrapped":     return Sparkles;
 		default:            return FileText;
 	}
 }
@@ -100,7 +102,7 @@ const Sidebar = () => {
 			{expanded ? (
 				<Logo class="text-primary w-24 shrink-0" />
 			) : (
-				<LogoL class="text-primary w-24 shrink-0" />
+				<LogoL class="text-primary w-4 shrink-0" />
 			)}
 			<div class="flex items-center justify-center">
 				<button
@@ -126,6 +128,8 @@ const Sidebar = () => {
 		const active = activeTabKey.value === key;
 		const Icon = getTabIcon(tab.type);
 		const newCount = tab.type === "course" ? ((newModuleCounts.value ?? {})[tab.id] ?? 0) : 0;
+		const isWrapped = tab.type === "wrapped";
+		const wrappedGradient = "linear-gradient(135deg, var(--theme-primary), color-mix(in srgb, var(--theme-primary) 60%, white))";
 		const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null);
 
 		const handleMouseEnter = (e: MouseEvent) => {
@@ -162,10 +166,16 @@ const Sidebar = () => {
 				onMouseLeave={handleMouseLeave}
 				target="_blank"
 				class={`group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
-					active
+					isWrapped
+						? active ? "text-page" : "text-content-muted hover:text-content hover:bg-primary/10"
+						: active
 						? "bg-primary text-on-primary"
 						: "text-content-muted hover:text-content hover:bg-primary/10"
 				}`}
+				style={isWrapped ? {
+					background: active ? wrappedGradient : undefined,
+					boxShadow: active ? "0 0 8px 1px color-mix(in srgb, var(--theme-primary) 35%, transparent)" : undefined,
+				} : undefined}
 			>
 				<Icon width={18} class="shrink-0" />
 				{!expanded && newCount > 0 && (

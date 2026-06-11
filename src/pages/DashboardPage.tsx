@@ -15,6 +15,7 @@ import { pinnedCourses, togglePin, isPinned } from "../stores/pinned";
 import { wsToken } from "../stores/auth";
 import { getAllCachedNewModuleCounts } from "../stores/seenModules";
 import { loadAnnouncements } from "../stores/indexeddb/announcements";
+import { trackModuleClick } from "../stores/indexeddb/activity";
 
 function parseLinks(html: string): { href: string; text: string }[] {
     try {
@@ -311,7 +312,7 @@ export default function DashboardPage() {
                                 <div
                                     key={task.id}
                                     class="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-page-secondary"
-                                    onClick={() => window.open(task.url, "_blank")}
+                                    onClick={() => { trackModuleClick(task.module, new Date(task.dueTimestamp * 1000)); window.open(task.url, "_blank"); }}
                                 >
                                     {(() => {
                                         const now = Date.now();
