@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag (e.g. v1.2.3) or commit hash to release. Defaults to latest tag."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -17,6 +23,26 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Resolve tag name
+        id: tag
+        run: |
+          # If the ref is already a tag name, use it directly
+          INPUT="${{ github.event.inputs.ref }}"
+          if git show-ref --verify --quiet "refs/tags/$INPUT" 2>/dev/null; then
+            echo "name=$INPUT" >> $GITHUB_OUTPUT
+          else
+            # Find the tag pointing at HEAD (works for both commit hash and tag checkouts)
+            TAG=$(git tag --points-at HEAD | grep '^v' | sort -V | tail -1)
+            if [ -z "$TAG" ]; then
+              echo "::error::No tag found pointing at this commit. Tag the commit first."
+              exit 1
+            fi
+            echo "name=$TAG" >> $GITHUB_OUTPUT
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -49,6 +75,7 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
           files: |
             ${{ steps.zips.outputs.chrome }}
             ${{ steps.zips.outputs.firefox }}
