@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Tag (e.g. v1.2.3) or commit hash to release. Defaults to latest tag."
+        description: "Commit hash or tag to build from. Defaults to latest tag."
         required: false
         default: ""
 
@@ -26,23 +26,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref || github.ref }}
           fetch-depth: 0
-
-      - name: Resolve tag name
-        id: tag
-        run: |
-          # If the ref is already a tag name, use it directly
-          INPUT="${{ github.event.inputs.ref }}"
-          if git show-ref --verify --quiet "refs/tags/$INPUT" 2>/dev/null; then
-            echo "name=$INPUT" >> $GITHUB_OUTPUT
-          else
-            # Find the tag pointing at HEAD (works for both commit hash and tag checkouts)
-            TAG=$(git tag --points-at HEAD | grep '^v' | sort -V | tail -1)
-            if [ -z "$TAG" ]; then
-              echo "::error::No tag found pointing at this commit. Tag the commit first."
-              exit 1
-            fi
-            echo "name=$TAG" >> $GITHUB_OUTPUT
-          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -72,11 +55,21 @@ jobs:
           echo "chrome=$CHROME_ZIP" >> $GITHUB_OUTPUT
           echo "firefox=$FIREFOX_ZIP" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          files: |
-            ${{ steps.zips.outputs.chrome }}
-            ${{ steps.zips.outputs.firefox }}
-          generate_release_notes: true
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Tag push — create a new release
+            gh release create "${{ github.ref_name }}" \
+              --generate-notes \
+              "${{ steps.zips.outputs.chrome }}" \
+              "${{ steps.zips.outputs.firefox }}"
+          else
+            # Manual trigger — upload (overwrite) assets on the latest release
+            LATEST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+            gh release upload "$LATEST_TAG" \
+              "${{ steps.zips.outputs.chrome }}" \
+              "${{ steps.zips.outputs.firefox }}" \
+              --clobber
+          fi
