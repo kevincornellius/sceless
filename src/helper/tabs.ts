@@ -39,7 +39,7 @@ export function TabToUrl(tab: Tab): string {
 			case "all-courses":
 				return "course/index.php";
 			case "wrapped":
-				return "local/sceless/wrapped";
+				return "sceless/wrapped";
 		}
 	};
 
@@ -78,7 +78,7 @@ export function UrlToTab(urlString: string): Tab | null {
 			return AllCoursesTab;
 		}
 
-		if (path === "/local/sceless/wrapped") {
+		if (path === "/sceless/wrapped") {
 			return WrappedTab;
 		}
 

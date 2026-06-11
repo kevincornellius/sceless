@@ -388,6 +388,50 @@ function injectNavbarMods() {
 	usernav.prepend(li);
 }
 
+function parseDueDateFromPage(): Date | null {
+	// Moodle renders the due date inside [data-region="activity-dates"]:
+	//   <div data-region="activity-dates">
+	//     <div><strong>Due:</strong> Friday, 22 May 2026, 9:00 PM</div>
+	//   </div>
+	const region = document.querySelector<HTMLElement>("[data-region='activity-dates']");
+	if (region) {
+		const text = region.textContent?.replace(/due:/i, "").trim() ?? "";
+		if (text && !/no due date/i.test(text)) {
+			const withoutWeekday = text.replace(/^[A-Za-z]+,\s*/, "");
+			const parsed = new Date(withoutWeekday);
+			if (!isNaN(parsed.getTime())) return parsed;
+		}
+	}
+	// Fallback: scan <td> labels (older Moodle themes)
+	for (const td of document.querySelectorAll<HTMLElement>("td")) {
+		if (td.textContent?.trim() !== "Due date") continue;
+		const valueCell = td.nextElementSibling as HTMLElement | null;
+		if (!valueCell) continue;
+		const text = valueCell.textContent?.trim() ?? "";
+		if (!text || /no due date/i.test(text)) return null;
+		const withoutWeekday = text.replace(/^[A-Za-z]+,\s*/, "");
+		const parsed = new Date(withoutWeekday);
+		return isNaN(parsed.getTime()) ? null : parsed;
+	}
+	return null;
+}
+
+async function trackAssignSubmissionIfNearDeadline(): Promise<void> {
+	const url = new URL(window.location.href);
+	if (url.pathname !== "/mod/assign/view.php") return;
+	if (url.searchParams.get("action") !== "editsubmission") return;
+
+	const dueDate = parseDueDateFromPage();
+	if (!dueDate) return;
+
+	const msUntilDue = dueDate.getTime() - Date.now();
+	// Count as "last-minute" if submitted within 2 hours of the deadline
+	if (msUntilDue <= 0 || msUntilDue >= 2 * 60 * 60 * 1000) return;
+
+	const { trackLastMinuteSubmission } = await import("@/src/stores/indexeddb/activity");
+	trackLastMinuteSubmission();
+}
+
 export default defineContentScript({
 	matches: [
 		"*://scele.cs.ui.ac.id/mod/**",
@@ -411,5 +455,6 @@ export default defineContentScript({
 		injectFont();
 		injectStyles();
 		injectNavbarMods();
+		trackAssignSubmissionIfNearDeadline();
 	},
 });

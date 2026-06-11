@@ -2,20 +2,23 @@ import { useState, useRef, useCallback, useEffect } from "preact/hooks";
 import {
     Trophy, Flame, BookOpen, AlertCircle,
     Zap, Star, TrendingUp, Download, Share2, ChevronDown, Moon, Sun,
+    Compass, Gamepad2, Briefcase, Coffee, Laptop, Heart,
 } from "lucide-preact";
 import { theme } from "../stores/theme";
 import type { ThemeConfig } from "../types/themes";
 import type { Tab } from "../types/state";
-import { SCELE_URL } from "../config";
+import { LogoL } from "../components/ui/Logo";
+import { SCELE_URL, WRAPPED_ENABLED } from "../config";
 import { getActivityStats } from "../stores/indexeddb/activity";
 import { loadSiteInfo } from "../stores/indexeddb/siteinfo";
 import { courses } from "../stores/indexeddb/course";
+import { wrappedSnapshotStorage } from "../storage";
 
 export const WrappedTab: Tab = {
     type: "wrapped",
     id: "page",
     title: "Wrapped",
-    url: `${SCELE_URL}/local/sceless/wrapped`,
+    url: `${SCELE_URL}/sceless/wrapped`,
 };
 
 // ── CSS variable shortcuts ────────────────────────────────────────────────────
@@ -68,6 +71,7 @@ function busiestMonth(dailyActivity: Record<string, number>): { name: string; co
 
 interface SlideData {
     userName: string;
+    userHandle: string;
     activeDays: number;
     totalActions: number;
     hourly: number[];
@@ -86,6 +90,7 @@ interface SlideData {
     themeChanges: number;
     quizReviews: number;
     lastMinuteOpens: number;
+    lastMinuteSubmissions: number;
     tabSwitches: number;
     busiestDayCount: number;
     weekendPct: number;
@@ -95,7 +100,25 @@ interface SlideData {
 }
 
 async function buildSlideData(): Promise<SlideData> {
-    const [stats, { info }] = await Promise.all([getActivityStats(), loadSiteInfo()]);
+    // Snapshot mode: freeze stats on first Wrapped open so the recap doesn't drift.
+    let activityStats = await (async () => {
+        if (WRAPPED_ENABLED !== "true") return getActivityStats();
+        const snap = await wrappedSnapshotStorage.getValue();
+        if (snap) {
+            // Zero out lastUsed so stale session timestamps don't bleed into theme time calc
+            return {
+                ...snap,
+                themeUsage: Object.fromEntries(
+                    Object.entries(snap.themeUsage).map(([k, v]) => [k, { ...v, lastUsed: 0 }])
+                ),
+            };
+        }
+        const live = await getActivityStats();
+        await wrappedSnapshotStorage.setValue(live);
+        return live;
+    })();
+
+    const [stats, { info }] = await Promise.all([Promise.resolve(activityStats), loadSiteInfo()]);
 
     const moduleClicksTotal = Object.values(stats.moduleTypeClicks).reduce((a, b) => a + b, 0);
     const totalActions = stats.tabSwitchCount + moduleClicksTotal + stats.quizReviewsOpened;
@@ -136,20 +159,21 @@ async function buildSlideData(): Promise<SlideData> {
     const streak = calculateLongestStreak(stats.activeDays);
 
     const personality = nightOwlPct >= 35 ? "Night Owl"
-        : stats.lastMinuteOpens > 5 ? "Deadline Fighter"
+        : (stats.lastMinuteOpens > 5 || stats.lastMinuteSubmissions > 2) ? "Deadline Fighter"
         : streak.days > 7 ? "Consistent Grinder"
         : "Steady Explorer";
 
     const personalityDesc = personality === "Night Owl"
         ? `${nightOwlPct}% of your SCELE activity happens after 10 PM. The night is your study hall.`
         : personality === "Deadline Fighter"
-        ? `You've opened ${stats.lastMinuteOpens} tasks within 2 hours of their deadline. You thrive under pressure.`
+        ? `You've submitted ${stats.lastMinuteSubmissions} assignment${stats.lastMinuteSubmissions !== 1 ? "s" : ""} within 2 hours of the deadline — and opened ${stats.lastMinuteOpens} tasks last-minute. You thrive under pressure.`
         : personality === "Consistent Grinder"
         ? `You logged in for ${streak.days} days straight. Discipline is your superpower.`
         : `You've visited ${stats.activeDays.length} different days consistently${topTheme ? `, mostly with the ${topTheme} theme` : ""}. Balanced approach.`;
 
     return {
         userName: info?.name.split(" ")[0] ?? "You",
+        userHandle: info?.username ?? "",
         activeDays: stats.activeDays.length,
         totalActions,
         hourly: stats.hourly,
@@ -168,6 +192,7 @@ async function buildSlideData(): Promise<SlideData> {
         themeChanges: stats.themeChanges,
         quizReviews: stats.quizReviewsOpened,
         lastMinuteOpens: stats.lastMinuteOpens,
+        lastMinuteSubmissions: stats.lastMinuteSubmissions,
         tabSwitches: stats.tabSwitchCount,
         busiestDayCount,
         weekendPct,
@@ -267,10 +292,13 @@ function OverviewSlide({ d }: { d: SlideData }) {
                         <div class="p-4 rounded-xl flex flex-col gap-1.5" style={{ backgroundColor: css.highlightA20, border: `1px solid ${css.edge}` }}>
                             <Zap class="w-5 h-5" style={{ color: css.highlight }} />
                             <p class="text-3xl font-black" style={{ color: css.content }}>
-                                {d.weekendPct}%
+                                {d.isWeekendWarrior ? d.weekendPct : 100 - d.weekendPct}%
                             </p>
                             <p class="text-xs font-semibold" style={{ color: css.muted }}>
-                                {d.isWeekendWarrior ? "weekend warrior 🎮" : "weekday grinder 💼"}
+                                <span class="inline-flex items-center gap-1">
+                                    {d.isWeekendWarrior ? <Gamepad2 class="w-3.5 h-3.5" /> : <Briefcase class="w-3.5 h-3.5" />}
+                                    {d.isWeekendWarrior ? "weekend warrior" : "weekday grinder"}
+                                </span>
                             </p>
                         </div>
                     </div>
@@ -349,6 +377,17 @@ function NightOwlSlide({ d }: { d: SlideData }) {
     const peakLabel = peak === 0 ? "midnight" : peak < 12 ? `${peak} AM` : peak === 12 ? "noon" : `${peak - 12} PM`;
     const maxBar = Math.max(...d.hourly, 1);
     const hourLabels = ["12a","","2a","","4a","","6a","","8a","","10a","","12p","","2p","","4p","","6p","","8p","","10p",""];
+    const hourlyTotal = d.hourly.reduce((a, b) => a + b, 0);
+    const morningPct   = hourlyTotal > 0 ? Math.round(d.hourly.slice(6, 12).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
+    const afternoonPct = hourlyTotal > 0 ? Math.round(d.hourly.slice(12, 18).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
+    const eveningPct   = hourlyTotal > 0 ? Math.round(d.hourly.slice(18, 22).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
+    const leftStat = d.nightOwlPct > 5
+        ? { icon: Moon,       label: "after 10 PM",    value: `${d.nightOwlPct}%`,  bg: css.primaryA12,   color: css.primary }
+        : morningPct > 20
+        ? { icon: Sun,        label: "before noon",    value: `${morningPct}%`,     bg: css.highlightA20, color: css.highlight }
+        : eveningPct >= afternoonPct
+        ? { icon: Zap,        label: "in the evening", value: `${eveningPct}%`,     bg: css.primaryA12,   color: css.primary }
+        : { icon: TrendingUp, label: "in afternoons",  value: `${afternoonPct}%`,   bg: css.highlightA20, color: css.highlight };
 
     return (
         <Slide bg={css.pageSec}>
@@ -356,7 +395,8 @@ function NightOwlSlide({ d }: { d: SlideData }) {
                 <div class="flex flex-col gap-3">
                     <Tag>Your rhythm</Tag>
                     <h2 class="text-4xl font-black leading-snug" style={{ color: css.content }}>
-                        You peak at<br />{peakLabel} 🌙
+                        You peak at<br />
+                        <span class="inline-flex items-center gap-2">{peakLabel} <Moon class="w-7 h-7 inline-block align-middle" style={{ color: css.primary }} /></span>
                     </h2>
                 </div>
                 <div class="flex flex-col gap-2">
@@ -384,15 +424,15 @@ function NightOwlSlide({ d }: { d: SlideData }) {
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <div class="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: css.primaryA12 }}>
-                        <Moon class="w-5 h-5" style={{ color: css.primary }} />
-                        <p class="text-2xl font-black" style={{ color: css.content }}>{d.nightOwlPct}%</p>
-                        <p class="text-xs font-semibold" style={{ color: css.muted }}>after 10 PM</p>
+                    <div class="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: leftStat.bg }}>
+                        <leftStat.icon class="w-5 h-5" style={{ color: leftStat.color }} />
+                        <p class="text-2xl font-black" style={{ color: css.content }}>{leftStat.value}</p>
+                        <p class="text-xs font-semibold" style={{ color: css.muted }}>{leftStat.label}</p>
                     </div>
                     <div class="p-4 rounded-xl flex flex-col gap-1" style={{ backgroundColor: css.highlightA20 }}>
                         <Sun class="w-5 h-5" style={{ color: css.highlight }} />
-                        <p class="text-2xl font-black" style={{ color: css.content }}>{d.midnightPct}%</p>
-                        <p class="text-xs font-semibold" style={{ color: css.muted }}>midnight activity</p>
+                        <p class="text-2xl font-black" style={{ color: css.content }}>{d.midnightPct > 0 ? `${d.midnightPct}%` : `${d.busiestDayCount}`}</p>
+                        <p class="text-xs font-semibold" style={{ color: css.muted }}>{d.midnightPct > 0 ? "midnight activity" : "actions on best day"}</p>
                     </div>
                 </div>
             </div>
@@ -404,7 +444,7 @@ function MidnightSlide({ d }: { d: SlideData }) {
     return (
         <Slide bg={css.primary}>
             <div class="flex flex-col gap-8 max-w-sm w-full items-center text-center">
-                <div class="text-7xl">🌙</div>
+                <Moon class="w-20 h-20" style={{ color: css.onPrimary, opacity: 0.9 }} />
                 <div class="flex flex-col gap-4">
                     <span class="text-[10px] font-black uppercase tracking-widest" style={{ color: css.onPrimaryA60 }}>
                         Midnight grind
@@ -419,7 +459,11 @@ function MidnightSlide({ d }: { d: SlideData }) {
                     </p>
                 </div>
                 <div class="flex gap-3">
-                    {["🍵", "☕", "💻"].map(e => <span key={e} class="text-3xl">{e}</span>)}
+                    {([Moon, Coffee, Laptop] as const).map((Icon, i) => (
+                        <div key={i} class="w-12 h-12 flex items-center justify-center rounded-xl" style={{ backgroundColor: css.onPrimaryA30 }}>
+                            <Icon class="w-6 h-6" style={{ color: css.onPrimary }} />
+                        </div>
+                    ))}
                 </div>
             </div>
         </Slide>
@@ -461,9 +505,6 @@ function ThemeSlide({ d }: { d: SlideData }) {
                     <h2 class="text-4xl font-black leading-snug" style={{ color: css.content }}>
                         Time spent<br />per theme
                     </h2>
-                    <p class="text-sm" style={{ color: css.muted }}>
-                        Total: {formatMs(total)} on SCELE
-                    </p>
                 </div>
                 {d.themeBreakdown.length === 0 ? (
                     <p class="text-sm" style={{ color: css.muted }}>No theme usage recorded yet.</p>
@@ -476,7 +517,7 @@ function ThemeSlide({ d }: { d: SlideData }) {
                                 <div key={e.name} class="flex flex-col gap-1.5">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center gap-2">
-                                            {isTop && <span class="text-xs font-black" style={{ color: css.primary }}>★</span>}
+                                            {isTop && <Star class="w-3.5 h-3.5 shrink-0" style={{ color: css.primary }} />}
                                             <span class="text-sm font-bold" style={{ color: css.content }}>{e.name}</span>
                                         </div>
                                         <div class="flex items-center gap-2">
@@ -501,15 +542,17 @@ function ThemeSlide({ d }: { d: SlideData }) {
 }
 
 function PersonalitySlide({ d }: { d: SlideData }) {
-    const emoji = d.personality === "Night Owl" ? "🦉"
-        : d.personality === "Deadline Fighter" ? "⚡"
-        : d.personality === "Consistent Grinder" ? "🔥"
-        : "🧭";
+    const PersonalityIcon = d.personality === "Night Owl" ? Moon
+        : d.personality === "Deadline Fighter" ? Zap
+        : d.personality === "Consistent Grinder" ? Flame
+        : Compass;
 
     return (
         <Slide>
             <div class="flex flex-col gap-8 max-w-sm w-full items-center text-center">
-                <div class="text-8xl">{emoji}</div>
+                <div class="w-28 h-28 rounded-3xl flex items-center justify-center" style={{ backgroundColor: css.primaryA20 }}>
+                    <PersonalityIcon class="w-14 h-14" style={{ color: css.primary }} />
+                </div>
                 <div class="flex flex-col gap-3 items-center">
                     <Tag>You are a</Tag>
                     <h2 class="text-4xl font-black mt-1" style={{ color: css.primary }}>{d.personality}</h2>
@@ -539,7 +582,7 @@ function EndSlide({ d }: { d: SlideData }) {
                 <Trophy class="w-20 h-20" style={{ color: css.onPrimary, opacity: 0.9 }} />
                 <div class="flex flex-col gap-4">
                     <h2 class="text-5xl font-black leading-tight" style={{ color: css.onPrimary }}>
-                        Keep it up 👋
+                        Keep it up
                     </h2>
                     <p class="text-base font-medium" style={{ color: css.onPrimaryA60 }}>
                         {d.totalActions.toLocaleString()} actions. {d.midnightPct}% midnight activity.<br />
@@ -554,6 +597,38 @@ function EndSlide({ d }: { d: SlideData }) {
     );
 }
 
+function ThankYouSlide() {
+    return (
+        <Slide>
+            <div class="flex flex-col items-center gap-10 text-center max-w-xs">
+                <div class="w-24 h-24 rounded-3xl flex items-center justify-center" style={{ backgroundColor: css.primaryA12 }}>
+                    <LogoL class="w-14 h-14" style={{ color: css.primary }} />
+                </div>
+                <div class="flex flex-col gap-4">
+                    <h2 class="text-4xl font-black leading-snug" style={{ color: css.content }}>
+                        Thanks for using<br />
+                        <span style={{ color: css.primary }}>Sceless</span>
+                    </h2>
+                    <p class="text-sm leading-relaxed" style={{ color: css.muted }}>
+                        If it made your SCELE life a little better,<br />
+                        consider leaving a review or starring it.
+                    </p>
+                </div>
+                <a
+                    href="https://sceless.cornellius.dev"
+                    target="_blank"
+                    rel="noreferrer"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-opacity hover:opacity-80"
+                    style={{ backgroundColor: css.primaryA12, color: css.primary }}
+                >
+                    <Heart class="w-4 h-4" />
+                    sceless.cornellius.dev
+                </a>
+            </div>
+        </Slide>
+    );
+}
+
 // ── Compact export card ───────────────────────────────────────────────────────
 // Uses only inline styles with real hex values — html-to-image can't resolve CSS vars.
 
@@ -562,26 +637,28 @@ function CompactCard({ d, t }: { d: SlideData; t: ThemeConfig }) {
     const maxHourly = Math.max(...d.hourly, 1);
     const maxWeekday = Math.max(...d.weekday, 1);
     const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
-    const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const personalityEmoji = d.personality === "Night Owl" ? "🦉" : d.personality === "Deadline Fighter" ? "⚡" : d.personality === "Consistent Grinder" ? "🔥" : "🧭";
+
+    const PersonalityIcon = d.personality === "Night Owl" ? Moon
+        : d.personality === "Deadline Fighter" ? Zap
+        : d.personality === "Consistent Grinder" ? Flame
+        : Compass;
     const topCourseMax = Math.max(...d.topCourses.map(c => c.count), 1);
     const barAccents = [t.primary, t.highlight, t.danger];
 
     const hourlyTotal = d.hourly.reduce((a, b) => a + b, 0);
-    const morningPct = hourlyTotal > 0 ? Math.round(d.hourly.slice(6, 12).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
-    const totalModuleClicks = Object.values(d.moduleTypeClicks).reduce((a: number, b: number) => a + b, 0);
-    const busiestWeekday = weekdayNames[d.weekday.indexOf(Math.max(...d.weekday))];
+    const morningPct   = hourlyTotal > 0 ? Math.round(d.hourly.slice(6, 12).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
+    const afternoonPct = hourlyTotal > 0 ? Math.round(d.hourly.slice(12, 18).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
+    const eveningPct   = hourlyTotal > 0 ? Math.round(d.hourly.slice(18, 22).reduce((a, b) => a + b, 0) / hourlyTotal * 100) : 0;
+    const avgDailyActions = d.activeDays > 0 ? Math.round(d.totalActions / d.activeDays) : 0;
 
-    // Smart conditional stats — never show a 0% that tells the user nothing
-    const timeOfDayStat = d.nightOwlPct > 5
-        ? { label: "Night owl", value: `${d.nightOwlPct}%` }
-        : morningPct > 25
-        ? { label: "Early bird", value: `${morningPct}%` }
-        : { label: "Busiest day", value: busiestWeekday };
-
-    const midnightStat = d.midnightPct > 0
-        ? { label: "Midnight activity", value: `${d.midnightPct}%` }
-        : { label: "Module clicks", value: totalModuleClicks };
+    // Always show the dominant time window — never highlight a minority
+    const windows = [
+        { label: "Night owl",   value: `${d.nightOwlPct}%`, pct: d.nightOwlPct },
+        { label: "Early bird",  value: `${morningPct}%`,    pct: morningPct },
+        { label: "Afternoon",   value: `${afternoonPct}%`,  pct: afternoonPct },
+        { label: "Evening",     value: `${eveningPct}%`,    pct: eveningPct },
+    ];
+    const timeOfDayStat = windows.reduce((a, b) => b.pct > a.pct ? b : a);
 
     const cell = (label: string, value: string | number, color?: string) => (
         <div style={{ backgroundColor: t.bg, padding: "12px 14px", display: "flex", flexDirection: "column" as const, gap: "3px" }}>
@@ -609,7 +686,7 @@ function CompactCard({ d, t }: { d: SlideData; t: ThemeConfig }) {
                             {d.activeDays} active days · {d.personality}
                         </p>
                     </div>
-                    <span style={{ fontSize: "40px", lineHeight: 1 }}>{personalityEmoji}</span>
+                    <PersonalityIcon style={{ width: "40px", height: "40px", color: t.onPrimary, opacity: 0.85 }} />
                 </div>
 
                 {/* Hourly bars */}
@@ -638,20 +715,16 @@ function CompactCard({ d, t }: { d: SlideData; t: ThemeConfig }) {
                 </div>
             </div>
 
-            {/* Stats grid */}
+            {/* Stats grid — 8 cells, 4x2 */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1px", background: t.border }}>
-                {cell("Active days",      d.activeDays)}
-                {cell("Tab switches",     d.tabSwitches)}
-                {cell("Peak hour",        peakLabel)}
-                {cell("Best streak",      d.longestStreak.days > 0 ? `${d.longestStreak.days}d` : "—")}
-                {cell("Busiest month",    d.busiest.name || "—")}
-                {cell(midnightStat.label, midnightStat.value)}
+                {cell("Active days",   d.activeDays)}
+                {cell("Best streak",   d.longestStreak.days > 0 ? `${d.longestStreak.days}d` : "—")}
+                {cell("Avg / day",     avgDailyActions > 0 ? avgDailyActions : "—")}
+                {cell("Best day",      d.busiestDayCount > 0 ? `${d.busiestDayCount} actions` : "—")}
+                {cell("Busiest month", d.busiest.name || "—")}
                 {cell(timeOfDayStat.label, timeOfDayStat.value)}
-                {cell("Last-minute",      d.lastMinuteOpens, d.lastMinuteOpens > 5 ? t.danger : undefined)}
-                {cell("Best day",         d.busiestDayCount > 0 ? `${d.busiestDayCount} actions` : "—")}
-                {cell(d.isWeekendWarrior ? "Weekend warrior 🎮" : "Weekday grinder 💼", `${d.weekendPct}%`)}
-                {d.topModule ? cell("Top module", `${d.topModule.type} ×${d.topModule.count}`) : cell("Quiz reviews", d.quizReviews)}
-                {cell("Theme changes",    d.themeChanges)}
+                {cell(d.isWeekendWarrior ? "Weekend" : "Weekday", `${d.isWeekendWarrior ? d.weekendPct : 100 - d.weekendPct}%`)}
+                {cell("Last-minute",   d.lastMinuteOpens, d.lastMinuteOpens > 5 ? t.danger : undefined)}
             </div>
 
             {/* Weekday bars */}
@@ -701,16 +774,17 @@ function CompactCard({ d, t }: { d: SlideData; t: ThemeConfig }) {
                 </div>
             )}
 
-            {/* Extras */}
-            <div style={{ display: "flex", gap: "1px", background: t.border }}>
-                {d.topTheme && cell("Fav theme", d.topTheme)}
+            {/* Extras — always 3 cells, always fills the row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1px", background: t.border }}>
+                {cell("Fav theme",    d.topTheme ?? "—")}
                 {cell("Quiz reviews", d.quizReviews)}
+                {cell("Tab switches", d.tabSwitches)}
             </div>
 
             {/* Footer */}
             <div style={{ padding: "8px 18px", borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: t.textMuted, fontSize: "8px", fontWeight: 700 }}>sceless.cornellius.dev</span>
-                <span style={{ color: t.textMuted, fontSize: "8px", fontWeight: 700 }}>{d.userName}</span>
+                <span style={{ color: t.textMuted, fontSize: "8px", fontWeight: 700 }}>{d.userHandle || d.userName}</span>
             </div>
         </div>
     );
@@ -720,7 +794,7 @@ function CompactCard({ d, t }: { d: SlideData; t: ThemeConfig }) {
 
 const SLIDE_LABELS = [
     "Cover", "Overview", "Busiest Month", "Top Courses",
-    "Your Rhythm", "Midnight Grind", "Best Streak", "Themes", "Personality", "Finale",
+    "Your Rhythm", "Midnight Grind", "Best Streak", "Themes", "Personality", "Finale", "Thank You",
 ];
 
 export default function WrappedPage() {
@@ -794,7 +868,7 @@ export default function WrappedPage() {
         );
     }
 
-    const slides = [HeroSlide, OverviewSlide, BusiestSlide, CoursesSlide, NightOwlSlide, MidnightSlide, StreakSlide, ThemeSlide, PersonalitySlide, EndSlide];
+    const slides = [HeroSlide, OverviewSlide, BusiestSlide, CoursesSlide, NightOwlSlide, MidnightSlide, StreakSlide, ThemeSlide, PersonalitySlide, EndSlide, ThankYouSlide];
 
     return (
         <div class="relative h-full w-full overflow-hidden" style={{ backgroundColor: css.page }}>

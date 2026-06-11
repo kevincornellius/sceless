@@ -13,6 +13,7 @@ export interface ActivityStats {
     activeDays: string[];
     dailyActivity: Record<string, number>;
     lastMinuteOpens: number;
+    lastMinuteSubmissions: number;
     courseVisits: Record<number, number>;
     moduleTypeClicks: Record<string, number>;
     tabSwitchCount: number;
@@ -27,6 +28,7 @@ const DEFAULT: ActivityStats = {
     activeDays: [],
     dailyActivity: {},
     lastMinuteOpens: 0,
+    lastMinuteSubmissions: 0,
     courseVisits: {},
     moduleTypeClicks: {},
     tabSwitchCount: 0,
@@ -126,10 +128,29 @@ export const trackThemeSwitch = (prevName: string, nextName: string): void => {
     });
 };
 
+// Called on beforeunload — commits the open session's elapsed time into totalMs so it
+// survives the next trackThemeInit call (which would otherwise reset lastUsed and lose it).
+export const trackThemeFlush = (themeName: string): void => {
+    const now = Date.now();
+    void update(s => {
+        const entry = s.themeUsage[themeName];
+        if (entry?.lastUsed) {
+            entry.totalMs += Math.min(now - entry.lastUsed, MAX_SESSION_MS);
+            // Reset to now rather than 0 — avoids a race where this write lands after
+            // trackThemeInit on the new page, which would leave lastUsed stuck at 0.
+            entry.lastUsed = now;
+        }
+    });
+};
+
 export const trackQuizReviewOpened = (): void => {
     const now = new Date();
     void update(s => {
         tickActivity(s, now);
         s.quizReviewsOpened++;
     });
+};
+
+export const trackLastMinuteSubmission = (): void => {
+    void update(s => { s.lastMinuteSubmissions++; });
 };
